@@ -218,7 +218,7 @@ $mysqli->close();
                 <li><a href="dashboard.php">📊 Dashboard</a></li>
                 <li><a href="my_courses.php">📚 My Courses</a></li>
                 <li><a href="register_courses.php">➕ Register Courses</a></li>
-                <li><a href="exam_results.php" class="active">📝 Exam Results</a></li>
+                <!-- Exam Results link removed as requested -->
                 <li><a href="assessments.php">📋 Assessments</a></li>
                 <li><a href="timetable.php">📅 Timetable</a></li>
                 <li><a href="payments.php">💰 Payments</a></li>

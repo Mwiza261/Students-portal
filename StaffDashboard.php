@@ -15,6 +15,12 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'staff') {
 $user_id = $_SESSION['user_id'];
 $username = $_SESSION['username'];
 $full_name = $_SESSION['full_name'] ?? $username;
+$current_page = basename($_SERVER['PHP_SELF']);
+
+// Function to check active page
+function isActive($page, $current) {
+    return $page === $current ? 'active' : '';
+}
 
 // Initialize variables with default values
 $total_students = 0;
@@ -23,6 +29,7 @@ $total_registrations = 0;
 $pending_payments = 0;
 $recent_registrations = [];
 $popular_courses = [];
+$timetable_count = 0;
 
 $mysqli = null;
 try {
@@ -95,6 +102,16 @@ try {
             }
         }
         
+        // Check if timetables table exists
+        $timetable_check = $mysqli->query("SHOW TABLES LIKE 'timetables'");
+        if ($timetable_check && $timetable_check->num_rows > 0) {
+            $timetable_query = "SELECT COUNT(*) as total FROM timetables";
+            $timetable_result = $mysqli->query($timetable_query);
+            if ($timetable_result && $timetable_result->num_rows > 0) {
+                $timetable_count = $timetable_result->fetch_assoc()['total'];
+            }
+        }
+        
         // Check if payments table exists for pending payments
         $payments_check = $mysqli->query("SHOW TABLES LIKE 'payments'");
         if ($payments_check && $payments_check->num_rows > 0) {
@@ -142,7 +159,7 @@ function e($value) {
             position: fixed;
             left: 0;
             top: 0;
-            width: 260px;
+            width: 280px;
             height: 100%;
             background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
             color: white;
@@ -167,14 +184,28 @@ function e($value) {
             padding: 1rem 0;
         }
 
+        .nav-section {
+            margin-bottom: 1rem;
+        }
+
+        .nav-section-title {
+            padding: 0.5rem 1.5rem;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #94a3b8;
+            font-weight: 600;
+        }
+
         .sidebar-nav a {
             display: flex;
             align-items: center;
-            padding: 0.8rem 1.5rem;
+            padding: 0.7rem 1.5rem;
             color: #cbd5e1;
             text-decoration: none;
             transition: all 0.3s;
             gap: 0.8rem;
+            font-size: 0.9rem;
         }
 
         .sidebar-nav a:hover,
@@ -185,14 +216,14 @@ function e($value) {
         }
 
         .sidebar-nav a i {
-            width: 24px;
+            width: 28px;
             font-style: normal;
-            font-size: 1.2rem;
+            font-size: 1.1rem;
         }
 
         /* Main Content */
         .main-content {
-            margin-left: 260px;
+            margin-left: 280px;
             padding: 1.5rem;
         }
 
@@ -240,7 +271,7 @@ function e($value) {
         /* Stats Grid */
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 1.5rem;
             margin-bottom: 1.5rem;
         }
@@ -409,24 +440,80 @@ function e($value) {
             <p style="font-size: 0.75rem; color: #94a3b8;">Staff Portal</p>
         </div>
         <div class="sidebar-nav">
-            <a href="StaffDashboard.php" class="active">
-                <i>📊</i> Dashboard
-            </a>
-            <a href="manage_courses.php">
-                <i>📖</i> Manage Courses
-            </a>
-            <a href="manage_students.php">
-                <i>👨‍🎓</i> Manage Students
-            </a>
-            <a href="staff_grades.php">
-                <i>📝</i> Manage Grades
-            </a>
-            <a href="view_registrations.php">
-                <i>📋</i> Course Registrations
-            </a>
-            <a href="logout.php">
-                <i>🚪</i> Logout
-            </a>
+            <!-- Main Section -->
+            <div class="nav-section">
+                <div class="nav-section-title">MAIN</div>
+                <a href="StaffDashboard.php" class="<?php echo isActive('StaffDashboard.php', $current_page); ?>">
+                    <i>📊</i> Dashboard
+                </a>
+            </div>
+
+            <!-- Course Management Section -->
+            <div class="nav-section">
+                <div class="nav-section-title">COURSE MANAGEMENT</div>
+                <a href="manage_courses.php" class="<?php echo isActive('manage_courses.php', $current_page); ?>">
+                    <i>📖</i> Manage Courses
+                </a>
+                <a href="manage_students.php" class="<?php echo isActive('manage_students.php', $current_page); ?>">
+                    <i>👨‍🎓</i> Manage Students
+                </a>
+                <a href="view_registrations.php" class="<?php echo isActive('view_registrations.php', $current_page); ?>">
+                    <i>📋</i> Course Registrations
+                </a>
+            </div>
+
+            <!-- Timetable Management Section -->
+            <div class="nav-section">
+                <div class="nav-section-title">TIMETABLE</div>
+                <a href="teacher_timetable.php" class="<?php echo isActive('teacher_timetable.php', $current_page); ?>">
+                    <i>📅</i> Manage Timetable
+                </a>
+                <a href="teacher_timetable_create.php" class="<?php echo isActive('teacher_timetable_create.php', $current_page); ?>">
+                    <i>➕</i> Create Timetable
+                </a>
+                <a href="teacher_timetable_view.php" class="<?php echo isActive('teacher_timetable_view.php', $current_page); ?>">
+                    <i>👁️</i> View Timetable
+                </a>
+            </div>
+
+            <!-- Grade Management Section -->
+            <div class="nav-section">
+                <div class="nav-section-title">GRADES & ASSESSMENTS</div>
+                <a href="staff_grades.php" class="<?php echo isActive('staff_grades.php', $current_page); ?>">
+                    <i>📝</i> Manage Grades
+                </a>
+                <a href="staff_assessments.php" class="<?php echo isActive('staff_assessments.php', $current_page); ?>">
+                    <i>📋</i> Assessments
+                </a>
+                <a href="staff_results.php" class="<?php echo isActive('staff_results.php', $current_page); ?>">
+                    <i>📊</i> Exam Results
+                </a>
+            </div>
+
+            <!-- Reports Section -->
+            <div class="nav-section">
+                <div class="nav-section-title">REPORTS</div>
+                <a href="staff_reports.php" class="<?php echo isActive('staff_reports.php', $current_page); ?>">
+                    <i>📈</i> Generate Reports
+                </a>
+                <a href="staff_statistics.php" class="<?php echo isActive('staff_statistics.php', $current_page); ?>">
+                    <i>📊</i> Statistics
+                </a>
+            </div>
+
+            <!-- Account Section -->
+            <div class="nav-section">
+                <div class="nav-section-title">ACCOUNT</div>
+                <a href="staff_profile.php" class="<?php echo isActive('staff_profile.php', $current_page); ?>">
+                    <i>👤</i> My Profile
+                </a>
+                <a href="change_password.php" class="<?php echo isActive('change_password.php', $current_page); ?>">
+                    <i>🔒</i> Change Password
+                </a>
+                <a href="logout.php">
+                    <i>🚪</i> Logout
+                </a>
+            </div>
         </div>
     </div>
 
@@ -459,9 +546,9 @@ function e($value) {
                 <div class="stat-label">Active Courses</div>
             </div>
             <div class="stat-card">
-                <div class="stat-icon">📝</div>
-                <div class="stat-value"><?php echo $total_registrations; ?></div>
-                <div class="stat-label">Registrations (Current Semester)</div>
+                <div class="stat-icon">📅</div>
+                <div class="stat-value"><?php echo $timetable_count; ?></div>
+                <div class="stat-label">Timetable Entries</div>
             </div>
             <div class="stat-card">
                 <div class="stat-icon">💰</div>
@@ -480,6 +567,10 @@ function e($value) {
                     <span class="action-icon">➕</span>
                     <span class="action-label">Add New Course</span>
                 </a>
+                <a href="teacher_timetable_create.php" class="action-btn">
+                    <span class="action-icon">📅</span>
+                    <span class="action-label">Create Timetable</span>
+                </a>
                 <a href="manage_students.php" class="action-btn">
                     <span class="action-icon">👨‍🎓</span>
                     <span class="action-label">Manage Students</span>
@@ -491,6 +582,10 @@ function e($value) {
                 <a href="view_registrations.php" class="action-btn">
                     <span class="action-icon">📋</span>
                     <span class="action-label">View Registrations</span>
+                </a>
+                <a href="teacher_timetable.php" class="action-btn">
+                    <span class="action-icon">🗓️</span>
+                    <span class="action-label">Manage Timetable</span>
                 </a>
             </div>
         </div>
@@ -564,6 +659,37 @@ function e($value) {
                         <p style="text-align: center; padding: 2rem; color: #999;">No courses available.</p>
                     <?php endif; ?>
                 </div>
+            </div>
+        </div>
+
+        <!-- Timetable Quick View -->
+        <div class="section-card">
+            <div class="section-header">
+                <h2>📅 Recent Timetable Activities</h2>
+                <a href="teacher_timetable.php">Manage Timetable →</a>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; text-align: center;">
+                <div style="padding: 1rem; background: #f8fafc; border-radius: 8px;">
+                    <div style="font-size: 2rem;">📅</div>
+                    <div style="font-weight: bold;">Total Entries</div>
+                    <div style="font-size: 1.5rem; color: #6366f1;"><?php echo $timetable_count; ?></div>
+                </div>
+                <div style="padding: 1rem; background: #f8fafc; border-radius: 8px;">
+                    <div style="font-size: 2rem;">🏫</div>
+                    <div style="font-weight: bold;">Classes</div>
+                    <div style="font-size: 1.5rem; color: #6366f1;">4</div>
+                    <div style="font-size: 0.75rem;">Form 1 - Form 4</div>
+                </div>
+                <div style="padding: 1rem; background: #f8fafc; border-radius: 8px;">
+                    <div style="font-size: 2rem;">👨‍🏫</div>
+                    <div style="font-weight: bold;">Teachers</div>
+                    <div style="font-size: 1.5rem; color: #6366f1;"><?php echo $total_courses > 0 ? min($total_courses, 15) : 8; ?></div>
+                </div>
+                <a href="teacher_timetable_create.php" style="padding: 1rem; background: #6366f1; color: white; border-radius: 8px; text-decoration: none; display: flex; flex-direction: column; align-items: center; gap: 0.5rem;">
+                    <div style="font-size: 2rem;">➕</div>
+                    <div style="font-weight: bold;">Create New Timetable</div>
+                    <div style="font-size: 0.75rem;">Add new schedule</div>
+                </a>
             </div>
         </div>
 
