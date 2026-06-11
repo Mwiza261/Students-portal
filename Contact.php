@@ -1,3 +1,8 @@
+\<?php
+// Optional: Start session if you want to show user info
+session_start();
+require_once 'db.php';
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6,7 +11,7 @@
     <title>Contact | Lilongwe Area 47 — Reach our team</title>
     <!-- Google Fonts + modern styling -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,600;14..32,700;14..32,800&display=swap" rel="stylesheet">
-    <!-- Font Awesome 6 (free icons, used for crisp contact visuals) -->
+    <!-- Font Awesome 6 -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
         * {
@@ -23,7 +28,6 @@
             padding: 2rem 1rem;
         }
 
-        /* main container */
         .contact-container {
             max-width: 1280px;
             margin: 0 auto;
@@ -33,7 +37,6 @@
             box-shadow: 0 25px 45px -12px rgba(0, 0, 0, 0.1);
         }
 
-        /* inner content */
         .contact-wrapper {
             background: #ffffff;
             border-radius: 2rem;
@@ -42,7 +45,6 @@
             border: 1px solid #e9f0f3;
         }
 
-        /* header region */
         .contact-header {
             background: linear-gradient(105deg, #1a5f4c 0%, #1e7761 100%);
             padding: 2rem 2rem 1.8rem;
@@ -75,7 +77,6 @@
             backdrop-filter: blur(4px);
         }
 
-        /* two column layout */
         .contact-grid {
             display: flex;
             flex-wrap: wrap;
@@ -94,7 +95,6 @@
             background: #ffffff;
         }
 
-        /* contact details cards */
         .detail-card {
             background: #f9fdfb;
             border-radius: 1.5rem;
@@ -175,7 +175,6 @@
             transform: translateY(-2px);
         }
 
-        /* contact form */
         .form-group {
             margin-bottom: 1.2rem;
         }
@@ -225,6 +224,11 @@
             box-shadow: 0 6px 14px rgba(0,0,0,0.1);
         }
 
+        .btn-submit:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
         .note-text {
             font-size: 0.8rem;
             color: #6e8b9c;
@@ -250,6 +254,16 @@
             margin-bottom: 1rem;
         }
 
+        .map-placeholder {
+            background: #eef3f0;
+            border-radius: 1rem;
+            padding: 0.8rem;
+            text-align: center;
+            font-size: 0.85rem;
+            color: #2f5a4b;
+            margin-top: 1rem;
+        }
+
         @media (max-width: 800px) {
             .contact-info {
                 border-right: none;
@@ -265,38 +279,24 @@
                 padding: 1.5rem;
             }
         }
-
-        .map-placeholder {
-            background: #eef3f0;
-            border-radius: 1rem;
-            padding: 0.8rem;
-            text-align: center;
-            font-size: 0.85rem;
-            color: #2f5a4b;
-            margin-top: 1rem;
-        }
-        .fa, .fas, .far {
-            font-family: "Font Awesome 6 Free";
-        }
     </style>
 </head>
 <body>
 <div class="contact-container">
     <div class="contact-wrapper">
         <div class="contact-header">
-            <h1>Let’s connect <i class="fas fa-paper-plane" style="font-size: 1.8rem;"></i></h1>
-            <p>We’re based in Lilongwe, Area 47 — Central Region, Capital City. Reach out for collaborations, support or just to say hello.</p>
+            <h1>Let's connect <i class="fas fa-paper-plane" style="font-size: 1.8rem;"></i></h1>
+            <p>We're based in Lilongwe, Area 47 — Central Region, Capital City. Reach out for collaborations, support or just to say hello.</p>
             <div class="header-location">
                 <i class="fas fa-map-marker-alt"></i> Lilongwe · Area 47 | Central Region | Capital City, Malawi
             </div>
         </div>
 
         <div class="contact-grid">
-            <!-- LEFT: contact details with explicit phone & email -->
+            <!-- LEFT: contact details -->
             <div class="contact-info">
                 <div class="badge-location"><i class="fas fa-location-dot"></i> Visit / Head office</div>
                 
-                <!-- direct phone card -->
                 <div class="detail-card">
                     <h3><i class="fas fa-phone-alt"></i> Call us</h3>
                     <div class="phone-numbers">
@@ -311,7 +311,6 @@
                     </div>
                 </div>
 
-                <!-- email card -->
                 <div class="detail-card">
                     <h3><i class="fas fa-envelope"></i> Email direct</h3>
                     <div class="contact-method">
@@ -322,7 +321,6 @@
                     </div>
                 </div>
 
-                <!-- location highlight + area 47 -->
                 <div class="detail-card">
                     <h3><i class="fas fa-map-pin"></i> Central Region Hub</h3>
                     <p><strong>📍 Area 47, Lilongwe</strong><br> Capital City, Malawi · Central Region</p>
@@ -338,18 +336,18 @@
                 </div>
             </div>
 
-            <!-- RIGHT: contact form + extra note -->
+            <!-- RIGHT: contact form -->
             <div class="contact-form-area">
                 <h2 style="font-size: 1.6rem; font-weight: 700; color: #1c5a49; margin-bottom: 0.5rem;"><i class="fas fa-comment-dots"></i> Send a message</h2>
-                <p style="margin-bottom: 1.5rem;">Fill out the form and we’ll get back to you using the details above.</p>
+                <p style="margin-bottom: 1.5rem;">Fill out the form and we'll get back to you using the details above.</p>
                 
-                <form action="#" method="post" id="contactForm">
+                <form id="contactForm">
                     <div class="form-group">
-                        <label for="name"><i class="fas fa-user"></i> Full name</label>
+                        <label for="name"><i class="fas fa-user"></i> Full name *</label>
                         <input type="text" id="name" name="name" placeholder="e.g. Thandiwe Banda" required>
                     </div>
                     <div class="form-group">
-                        <label for="email"><i class="fas fa-envelope"></i> Email address</label>
+                        <label for="email"><i class="fas fa-envelope"></i> Email address *</label>
                         <input type="email" id="email" name="email" placeholder="hello@example.com" required>
                     </div>
                     <div class="form-group">
@@ -357,10 +355,13 @@
                         <input type="tel" id="phone" name="phone" placeholder="0995 669 356 / 0886 836 955">
                     </div>
                     <div class="form-group">
-                        <label for="message"><i class="fas fa-pen"></i> Message / Inquiry</label>
-                        <textarea id="message" name="message" rows="5" placeholder="Tell us how we can help..."></textarea>
+                        <label for="message"><i class="fas fa-pen"></i> Message / Inquiry *</label>
+                        <textarea id="message" name="message" rows="5" placeholder="Tell us how we can help..." required></textarea>
                     </div>
-                    <button type="button" class="btn-submit" id="fakeSubmitBtn"><i class="fas fa-paper-plane"></i> Send message</button>
+                    <button type="submit" class="btn-submit" id="submitBtn">
+                        <i class="fas fa-paper-plane"></i> Send message
+                    </button>
+                    <div id="formMessage" style="margin-top: 1rem; padding: 0.75rem; border-radius: 0.75rem; display: none;"></div>
                     <div class="note-text">
                         <i class="fas fa-shield-alt"></i> We respect your privacy. Your details stay confidential.
                     </div>
@@ -375,7 +376,6 @@
             </div>
         </div>
 
-        <!-- additional footer / location repeat for seo clarity -->
         <div style="background: #f8fafc; padding: 1rem 2rem; text-align: center; border-top: 1px solid #e9f0f3; font-size: 0.85rem;">
             <p><i class="fas fa-map-marked-alt"></i> Lilongwe, Area 47 — Central Region, Capital City, Malawi  |  Phone: 0995 669 356 / 0886 836 955  |  Email: mwizamvula261@gmail.com</p>
             <p style="margin-top: 0.3rem;">&copy; 2025 — Connect with our Area 47 team | Rooted in the central region</p>
@@ -383,26 +383,57 @@
     </div>
 </div>
 
-<!-- simple alert demonstration (interactive but safe) -->
 <script>
-    (function() {
-        const submitBtn = document.getElementById('fakeSubmitBtn');
-        if (submitBtn) {
-            submitBtn.addEventListener('click', function(e) {
-                const nameField = document.getElementById('name');
-                const emailField = document.getElementById('email');
-                const msgField = document.getElementById('message');
-                if (nameField.value.trim() === '' || emailField.value.trim() === '') {
-                    alert('📝 Please provide at least your name and email address before sending.');
-                    return;
-                }
-                // just a friendly UI feedback (demo)
-                alert(`✅ Thanks ${nameField.value.split(' ')[0] || 'friend'}! Your message has been received.\n\nWe'll reply to ${emailField.value} within 24h.\n\nYou can also call us directly on 0995 669 356 / 0886 836 955.`);
-                // optionally, could reset but we keep for demo
-                document.getElementById('contactForm').reset();
-            });
+document.getElementById('contactForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const submitBtn = document.getElementById('submitBtn');
+    const formMessage = document.getElementById('formMessage');
+    const originalBtnText = submitBtn.innerHTML;
+    
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+    formMessage.style.display = 'none';
+    
+    const formData = new FormData(this);
+    
+    try {
+        const response = await fetch('contact_handler.php', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            formMessage.innerHTML = '<i class="fas fa-check-circle"></i> ' + result.message;
+            formMessage.style.backgroundColor = '#d4edda';
+            formMessage.style.color = '#155724';
+            formMessage.style.border = '1px solid #c3e6cb';
+            formMessage.style.display = 'block';
+            this.reset();
+        } else {
+            formMessage.innerHTML = '<i class="fas fa-exclamation-triangle"></i> ' + result.message;
+            formMessage.style.backgroundColor = '#f8d7da';
+            formMessage.style.color = '#721c24';
+            formMessage.style.border = '1px solid #f5c6cb';
+            formMessage.style.display = 'block';
         }
-    })();
+    } catch(error) {
+        formMessage.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Network error. Please try again.';
+        formMessage.style.backgroundColor = '#f8d7da';
+        formMessage.style.color = '#721c24';
+        formMessage.style.border = '1px solid #f5c6cb';
+        formMessage.style.display = 'block';
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalBtnText;
+        
+        setTimeout(() => {
+            formMessage.style.display = 'none';
+        }, 5000);
+    }
+});
 </script>
 </body>
 </html>

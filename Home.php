@@ -11,8 +11,8 @@ $socialLinks = [
     ['label' => 'LinkedIn',  'href' => '#', 'icon' => 'M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-4 0v7h-4v-7a6 6 0 016-6zM2 9h4v12H2z M4 6a2 2 0 100-4 2 2 0 000 4z'],
 ];
 
-// Utility links removed as requested (Calendar, Contact, Support removed from top bar)
-$utilityLinks = []; // Empty array - no links in the top utility bar
+// Utility links removed as requested
+$utilityLinks = [];
 
 $navLinks = [
     ['label' => 'Home',       'href' => 'Home.php'],
@@ -51,7 +51,7 @@ $features = [
     [
         'title' => 'Student Portal',
         'desc'  => 'View timetables, assignments, grades, and campus updates in one student-friendly dashboard.',
-        'href'  => '/Login.php',
+        'href'  => 'Login.php',
         'icon'  => 'M12 14l9-5-9-5-9 5 9 5z M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z',
         'color' => '#6366f1',
         'bg'    => 'rgba(99,102,241,0.12)',
@@ -59,7 +59,7 @@ $features = [
     [
         'title' => 'Staff Portal',
         'desc'  => 'Streamline administration, enter grades, manage classes, and communicate with students.',
-        'href'  => '/StaffLogin.php',
+        'href'  => 'StaffLogin.php',
         'icon'  => 'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2 M23 21v-2a4 4 0 00-3-3.87 M16 3.13a4 4 0 010 7.75 M9 7a4 4 0 100 8 4 4 0 000-8z',
         'color' => '#38bdf8',
         'bg'    => 'rgba(56,189,248,0.12)',
@@ -67,7 +67,7 @@ $features = [
     [
         'title' => 'E-Learning',
         'desc'  => 'Join interactive lessons, submit coursework, and access learning resources wherever you are.',
-        'href'  => '/elearning.php',
+        'href'  => 'elearning.php',
         'icon'  => 'M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z',
         'color' => '#a3e635',
         'bg'    => 'rgba(163,230,53,0.12)',
@@ -75,7 +75,7 @@ $features = [
     [
         'title' => 'Library',
         'desc'  => 'Search materials, browse library hours, and access digital archives for research support.',
-        'href'  => '/library.php',
+        'href'  => 'library.php',
         'icon'  => 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253',
         'color' => '#fb923c',
         'bg'    => 'rgba(251,146,60,0.12)',
@@ -99,24 +99,31 @@ $footerLinks = [
 $currentPath = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 
 function isActive(string $href, string $current): bool {
-    // Strip leading slash and query string from current path for comparison
     $base = basename(parse_url($current, PHP_URL_PATH));
     if ($base === '' || $base === 'index.php') $base = 'Home.php';
     return $href === $base;
 }
 
 function e($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
+
+// Get the current page name for title
+$currentPage = basename($_SERVER['PHP_SELF']);
+$pageTitle = 'Chigoneka School';
+if ($currentPage == 'about.php') $pageTitle = 'About Us | Chigoneka School';
+if ($currentPage == 'contact.php') $pageTitle = 'Contact Us | Chigoneka School';
+if ($currentPage == 'register.php') $pageTitle = 'Register | Chigoneka School';
+if ($currentPage == 'Login.php') $pageTitle = 'Student Login | Chigoneka School';
+if ($currentPage == 'StaffLogin.php') $pageTitle = 'Staff Login | Chigoneka School';
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Chigoneka School | Home</title>
+  <title><?php echo $pageTitle; ?></title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    /* ──── Reset & Tokens ──── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
       --bg:      #04070f;
@@ -131,10 +138,39 @@ function e($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'
     html, body { min-height: 100%; background: var(--bg); color: var(--text); scroll-behavior: smooth; }
     body { font-family: 'DM Sans', system-ui, sans-serif; line-height: 1.7; }
     a { color: inherit; text-decoration: none; }
-    img { display: block; max-width: 100%; }
     button { font: inherit; cursor: pointer; border: none; background: none; }
 
-    /* ──── Utility Bar (only social icons now) ──── */
+    /* Back Button */
+    .back-button-container {
+      max-width: 1200px;
+      margin: 1rem auto 0;
+      padding: 0 1.25rem;
+    }
+    .back-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.6rem 1.2rem;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border);
+      border-radius: 40px;
+      color: var(--muted);
+      font-size: 0.85rem;
+      font-weight: 500;
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+    .back-btn:hover {
+      background: rgba(99,102,241,0.15);
+      color: var(--accent);
+      border-color: rgba(99,102,241,0.3);
+      transform: translateX(-3px);
+    }
+    .back-btn svg {
+      width: 18px;
+      height: 18px;
+    }
+
     .utility-bar {
       background: #02040e;
       border-bottom: 1px solid var(--border);
@@ -144,7 +180,7 @@ function e($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'
     .utility-bar .inner {
       max-width: 1200px; margin: 0 auto;
       padding: .5rem 1.25rem;
-      display: flex; align-items: center; justify-content: flex-end; /* Align social icons to the right */
+      display: flex; align-items: center; justify-content: flex-end;
       gap: 1rem;
     }
     .utility-bar .social { display: flex; gap: .75rem; align-items: center; }
@@ -157,7 +193,6 @@ function e($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'
     }
     .utility-bar .social a:hover { background: var(--indigo); color: #fff; }
 
-    /* ──── Navbar ──── */
     .navbar {
       position: sticky; top: 0; z-index: 100;
       background: rgba(4,7,15,.88);
@@ -221,7 +256,6 @@ function e($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'
     }
     .hamburger:hover { color: #fff; background: rgba(255,255,255,.08); }
 
-    /* mobile menu */
     #mobile-menu {
       display: none;
       background: rgba(4,7,15,.97);
@@ -239,14 +273,11 @@ function e($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'
     #mobile-menu .m-ctas { display: flex; flex-direction: column; gap: .6rem; margin-top: 1rem; }
     #mobile-menu .btn-solid, #mobile-menu .btn-ghost { width: 100%; text-align: center; display: block; padding: .85rem; }
 
-    /* ──── Hero Carousel ──── */
     .hero {
       position: relative;
       height: 92vh; min-height: 540px; max-height: 900px;
       overflow: hidden;
     }
-
-    /* Slides */
     .slide {
       position: absolute; inset: 0;
       background-size: cover; background-position: center center;
@@ -254,32 +285,20 @@ function e($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'
       transition: opacity .8s cubic-bezier(.4,0,.2,1);
     }
     .slide.active { opacity: 1; }
-
-    /* Ken Burns per slide */
     .slide-img {
-      position: absolute; inset: -6%;   /* extra room for zoom travel */
+      position: absolute; inset: -6%;
       background-size: cover; background-position: center center;
       animation: none;
     }
     .slide.active .slide-img { animation: kenburns 8s ease-out forwards; }
-
     @keyframes kenburns {
       0%   { transform: scale(1.08) translate(1%, 0.5%); }
       100% { transform: scale(1.0)  translate(0%, 0%);   }
     }
-
-    /* Overlay */
     .slide-overlay {
       position: absolute; inset: 0;
-      background: linear-gradient(
-        105deg,
-        rgba(4,7,15,.88) 0%,
-        rgba(4,7,15,.55) 45%,
-        rgba(4,7,15,.15) 100%
-      );
+      background: linear-gradient(105deg, rgba(4,7,15,.88) 0%, rgba(4,7,15,.55) 45%, rgba(4,7,15,.15) 100%);
     }
-
-    /* Hero content */
     .hero-body {
       position: relative; z-index: 4;
       height: 100%;
@@ -337,130 +356,41 @@ function e($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'
       transition: background .2s, border-color .2s;
     }
     .hero-btn-secondary:hover { background: rgba(255,255,255,.13); border-color: rgba(255,255,255,.35); }
+    @keyframes fadeUp { to { opacity: 1; transform: translateY(0); } }
 
-    @keyframes fadeUp {
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    /* Progress bar at top of hero */
-    .hero-progress {
-      position: absolute; top: 0; left: 0; z-index: 5;
-      height: 3px; background: rgba(255,255,255,.08);
-      width: 100%;
-    }
-    .hero-progress-fill {
-      height: 100%; background: var(--accent);
-      width: 0%;
-      transition: width linear;
-    }
-
-    /* Controls */
-    .hero-controls {
-      position: absolute; bottom: 2rem; right: 1.5rem; z-index: 5;
-      display: flex; gap: .6rem; align-items: center;
-    }
-    .hero-arrow {
-      width: 44px; height: 44px; border-radius: 12px;
-      background: rgba(0,0,0,.4); color: #fff;
-      border: 1px solid rgba(255,255,255,.15);
-      display: grid; place-items: center;
-      backdrop-filter: blur(8px);
-      transition: background .2s, transform .15s;
-    }
+    .hero-progress { position: absolute; top: 0; left: 0; z-index: 5; height: 3px; background: rgba(255,255,255,.08); width: 100%; }
+    .hero-progress-fill { height: 100%; background: var(--accent); width: 0%; transition: width linear; }
+    .hero-controls { position: absolute; bottom: 2rem; right: 1.5rem; z-index: 5; display: flex; gap: .6rem; align-items: center; }
+    .hero-arrow { width: 44px; height: 44px; border-radius: 12px; background: rgba(0,0,0,.4); color: #fff; border: 1px solid rgba(255,255,255,.15); display: grid; place-items: center; backdrop-filter: blur(8px); transition: background .2s, transform .15s; }
     .hero-arrow:hover { background: rgba(0,0,0,.65); transform: scale(1.05); }
+    .hero-dots { position: absolute; bottom: 2.1rem; left: 50%; transform: translateX(-50%); display: flex; gap: .5rem; align-items: center; z-index: 5; }
+    .hero-dot { width: 8px; height: 8px; border-radius: 999px; background: rgba(255,255,255,.25); border: none; padding: 0; transition: width .3s, background .3s; }
+    .hero-dot.active { width: 28px; background: var(--accent); }
+    .hero-counter { position: absolute; bottom: 2.35rem; right: 7.5rem; z-index: 5; color: rgba(255,255,255,.45); font-size: .78rem; font-variant-numeric: tabular-nums; }
 
-    /* Dots */
-    .hero-dots {
-      position: absolute; bottom: 2.1rem; left: 50%; transform: translateX(-50%);
-      display: flex; gap: .5rem; align-items: center; z-index: 5;
-    }
-    .hero-dot {
-      width: 8px; height: 8px; border-radius: 999px;
-      background: rgba(255,255,255,.25);
-      border: none; padding: 0;
-      transition: width .3s, background .3s;
-    }
-    .hero-dot.active {
-      width: 28px; background: var(--accent);
-    }
-
-    /* Slide counter */
-    .hero-counter {
-      position: absolute; bottom: 2.35rem; right: 7.5rem; z-index: 5;
-      color: rgba(255,255,255,.45); font-size: .78rem; font-variant-numeric: tabular-nums;
-    }
-
-    /* ──── Stats ribbon ──── */
-    .stats-ribbon {
-      background: var(--surface);
-      border-top: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
-    }
-    .stats-ribbon .inner {
-      max-width: 1200px; margin: 0 auto;
-      padding: 2.25rem 1.25rem;
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 1.5rem;
-    }
+    .stats-ribbon { background: var(--surface); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+    .stats-ribbon .inner { max-width: 1200px; margin: 0 auto; padding: 2.25rem 1.25rem; display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem; }
     .stat { text-align: center; }
-    .stat-value {
-      font-family: 'Playfair Display', serif;
-      font-size: 2.2rem; font-weight: 900; color: #fff;
-      line-height: 1;
-    }
+    .stat-value { font-family: 'Playfair Display', serif; font-size: 2.2rem; font-weight: 900; color: #fff; line-height: 1; }
     .stat-label { font-size: .8rem; color: var(--muted); margin-top: .35rem; }
 
-    /* ──── Features ──── */
     .features { padding: 5rem 1.25rem; background: var(--bg); }
     .features .inner { max-width: 1200px; margin: 0 auto; }
-    .section-label {
-      font-size: .72rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
-      color: var(--indigo); margin-bottom: .75rem;
-    }
-    .section-title {
-      font-family: 'Playfair Display', serif;
-      font-size: clamp(1.8rem, 2.5vw, 2.6rem);
-      color: #fff; font-weight: 900; line-height: 1.12;
-      max-width: 540px; margin-bottom: 1rem;
-    }
+    .section-label { font-size: .72rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--indigo); margin-bottom: .75rem; }
+    .section-title { font-family: 'Playfair Display', serif; font-size: clamp(1.8rem, 2.5vw, 2.6rem); color: #fff; font-weight: 900; line-height: 1.12; max-width: 540px; margin-bottom: 1rem; }
     .section-sub { color: var(--muted); max-width: 560px; margin-bottom: 3rem; }
-
-    .feature-grid {
-      display: grid; gap: 1.1rem;
-      grid-template-columns: 1fr;
-    }
-    .feature-card {
-      display: block;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 20px;
-      padding: 2rem 1.75rem;
-      transition: transform .25s, border-color .25s, box-shadow .25s;
-      position: relative; overflow: hidden;
-    }
-    .feature-card::before {
-      content: '';
-      position: absolute; top: -1px; left: 2rem;
-      height: 2px; width: 40px;
-      background: var(--card-accent, var(--indigo));
-      border-radius: 2px;
-      transition: width .3s;
-    }
+    .feature-grid { display: grid; gap: 1.1rem; grid-template-columns: 1fr; }
+    .feature-card { display: block; background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 2rem 1.75rem; transition: transform .25s, border-color .25s, box-shadow .25s; position: relative; overflow: hidden; }
+    .feature-card::before { content: ''; position: absolute; top: -1px; left: 2rem; height: 2px; width: 40px; background: var(--card-accent, var(--indigo)); border-radius: 2px; transition: width .3s; }
     .feature-card:hover { transform: translateY(-5px); border-color: rgba(99,102,241,.25); box-shadow: 0 24px 60px rgba(0,0,0,.35); }
     .feature-card:hover::before { width: 80px; }
-    .feat-icon {
-      width: 50px; height: 50px; border-radius: 14px;
-      display: grid; place-items: center; margin-bottom: 1.25rem;
-      border: 1px solid var(--border);
-    }
+    .feat-icon { width: 50px; height: 50px; border-radius: 14px; display: grid; place-items: center; margin-bottom: 1.25rem; border: 1px solid var(--border); }
     .feat-icon svg { width: 22px; height: 22px; }
     .feat-title { font-size: 1rem; font-weight: 700; color: #fff; margin-bottom: .6rem; }
-    .feat-desc  { color: var(--muted); font-size: .9rem; line-height: 1.75; }
+    .feat-desc { color: var(--muted); font-size: .9rem; line-height: 1.75; }
     .feat-arrow { margin-top: 1.25rem; font-size: .8rem; font-weight: 600; display: flex; align-items: center; gap: .4rem; transition: gap .2s; }
     .feature-card:hover .feat-arrow { gap: .7rem; }
 
-    /* ──── Footer ──── */
     .footer { background: #020510; border-top: 1px solid var(--border); padding: 4rem 1.25rem 2rem; }
     .footer .inner { max-width: 1200px; margin: 0 auto; }
     .footer-grid { display: grid; gap: 2.5rem; grid-template-columns: 1fr; margin-bottom: 3rem; }
@@ -470,18 +400,12 @@ function e($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'
     .footer-list { list-style: none; display: grid; gap: .7rem; }
     .footer-list a { color: var(--muted); font-size: .88rem; transition: color .2s; }
     .footer-list a:hover { color: var(--accent); }
-    .footer-bottom {
-      border-top: 1px solid var(--border);
-      padding-top: 1.5rem;
-      display: flex; flex-direction: column; gap: .75rem; align-items: center; justify-content: space-between;
-      text-align: center;
-    }
+    .footer-bottom { border-top: 1px solid var(--border); padding-top: 1.5rem; display: flex; flex-direction: column; gap: .75rem; align-items: center; justify-content: space-between; text-align: center; }
     .footer-copy { color: var(--muted); font-size: .82rem; }
     .footer-legal { display: flex; flex-wrap: wrap; justify-content: center; gap: 1.25rem; }
     .footer-legal a { color: var(--muted); font-size: .82rem; transition: color .2s; }
     .footer-legal a:hover { color: var(--accent); }
 
-    /* ──── Responsive ──── */
     @media (min-width: 640px) {
       .stats-ribbon .inner { grid-template-columns: repeat(4, 1fr); }
       .feature-grid { grid-template-columns: repeat(2, 1fr); }
@@ -500,7 +424,16 @@ function e($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'
 </head>
 <body>
 
-<!-- ── Utility Bar (Only Social Icons, no text links) ── -->
+<!-- Back Button (only shows if there is history or not on home page) -->
+<div class="back-button-container" id="backButtonContainer" style="display: none;">
+  <button class="back-btn" onclick="goBack()">
+    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+    </svg>
+    Back
+  </button>
+</div>
+
 <div class="utility-bar">
   <div class="inner">
     <div class="social">
@@ -515,7 +448,6 @@ function e($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'
   </div>
 </div>
 
-<!-- ── Navbar ── -->
 <nav class="navbar" aria-label="Main navigation">
   <div class="inner">
     <a href="Home.php" class="brand">
@@ -530,7 +462,6 @@ function e($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'
       </div>
     </a>
 
-    <!-- Desktop nav -->
     <div class="nav-links">
       <?php foreach ($navLinks as $n): ?>
         <a class="nav-link<?= isActive($n['href'], $currentPath) ? ' active' : '' ?>"
@@ -542,7 +473,6 @@ function e($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'
       <a class="btn-solid" href="StaffLogin.php">Staff Portal</a>
     </div>
 
-    <!-- Hamburger -->
     <button class="hamburger" id="hamburger" aria-expanded="false" aria-label="Toggle menu">
       <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M4 6h16M4 12h16M4 18h16"/>
@@ -550,7 +480,6 @@ function e($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'
     </button>
   </div>
 
-  <!-- Mobile menu -->
   <div id="mobile-menu" aria-hidden="true">
     <?php foreach ($navLinks as $n): ?>
       <a class="m-link<?= isActive($n['href'], $currentPath) ? ' active' : '' ?>"
@@ -564,12 +493,10 @@ function e($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'
   </div>
 </nav>
 
-<!-- ── Hero Carousel ── -->
+<?php if (basename($_SERVER['PHP_SELF']) == 'Home.php' || basename($_SERVER['PHP_SELF']) == 'index.php'): ?>
 <section class="hero" id="hero">
-  <!-- Progress bar -->
   <div class="hero-progress"><div class="hero-progress-fill" id="progress-fill"></div></div>
 
-  <!-- Slides (image layer + overlay) -->
   <?php foreach ($heroSlides as $i => $slide): ?>
     <div class="slide<?= $i === 0 ? ' active' : '' ?>" data-index="<?= $i ?>">
       <div class="slide-img" style="background-image:url('<?= e($slide['bg']) ?>');"></div>
@@ -577,7 +504,6 @@ function e($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'
     </div>
   <?php endforeach; ?>
 
-  <!-- Content -->
   <div class="hero-body" id="hero-body">
     <span class="hero-eyebrow">✦ Chigoneka School</span>
     <h1 class="hero-title" id="hero-title"><?= e($heroSlides[0]['title']) ?></h1>
@@ -588,28 +514,24 @@ function e($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'
     </div>
   </div>
 
-  <!-- Dots -->
   <div class="hero-dots" id="hero-dots">
     <?php foreach ($heroSlides as $i => $slide): ?>
       <button class="hero-dot<?= $i === 0 ? ' active' : '' ?>" data-index="<?= $i ?>" aria-label="Slide <?= $i+1 ?>"></button>
     <?php endforeach; ?>
   </div>
 
-  <!-- Counter -->
   <div class="hero-counter" id="hero-counter">1 / <?= count($heroSlides) ?></div>
 
-  <!-- Arrow controls -->
   <div class="hero-controls">
     <button class="hero-arrow" id="prev-btn" aria-label="Previous slide">
-      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
     </button>
     <button class="hero-arrow" id="next-btn" aria-label="Next slide">
-      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
     </button>
   </div>
 </section>
 
-<!-- ── Stats ribbon ── -->
 <div class="stats-ribbon">
   <div class="inner">
     <?php foreach ($stats as $stat): ?>
@@ -621,7 +543,6 @@ function e($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'
   </div>
 </div>
 
-<!-- ── Features ── -->
 <section class="features">
   <div class="inner">
     <div class="section-label">Our Portals</div>
@@ -632,7 +553,7 @@ function e($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'
       <?php foreach ($features as $f): ?>
         <a class="feature-card" href="<?= e($f['href']) ?>" style="--card-accent:<?= e($f['color']) ?>;">
           <div class="feat-icon" style="background:<?= e($f['bg']) ?>; color:<?= e($f['color']) ?>;">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
               <?php foreach (explode(' M', $f['icon']) as $pi => $segment): ?>
                 <path d="<?= $pi === 0 ? e($segment) : 'M' . e($segment) ?>"/>
               <?php endforeach; ?>
@@ -646,8 +567,8 @@ function e($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'
     </div>
   </div>
 </section>
+<?php endif; ?>
 
-<!-- ── Footer ── -->
 <footer class="footer">
   <div class="inner">
     <div class="footer-grid">
@@ -694,12 +615,31 @@ function e($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'
 </footer>
 
 <script>
+// Back button functionality using browser history
+function goBack() {
+    if (document.referrer && document.referrer.indexOf(window.location.hostname) !== -1) {
+        window.history.back();
+    } else {
+        window.location.href = 'Home.php';
+    }
+}
+
+// Show back button if not on home page
+const currentPage = window.location.pathname.split('/').pop();
+if (currentPage !== 'Home.php' && currentPage !== 'index.php' && currentPage !== '') {
+    const backBtnContainer = document.getElementById('backButtonContainer');
+    if (backBtnContainer) {
+        backBtnContainer.style.display = 'block';
+    }
+}
+
+// Hero carousel only on home page
+<?php if (basename($_SERVER['PHP_SELF']) == 'Home.php' || basename($_SERVER['PHP_SELF']) == 'index.php'): ?>
 (function () {
   var SLIDES   = <?= json_encode($heroSlides, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
-  var INTERVAL = 6000; // ms per slide
+  var INTERVAL = 6000;
   var current  = 0;
   var timer    = null;
-  var progressTimer = null;
 
   var slideEls  = document.querySelectorAll('.slide');
   var dotEls    = document.querySelectorAll('.hero-dot');
@@ -709,12 +649,10 @@ function e($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'
   var counterEl = document.getElementById('hero-counter');
   var fillEl    = document.getElementById('progress-fill');
 
-  /* ── Progress bar ── */
   function startProgress() {
     if (fillEl) {
       fillEl.style.transition = 'none';
       fillEl.style.width = '0%';
-      // allow reflow then animate
       requestAnimationFrame(function () {
         requestAnimationFrame(function () {
           fillEl.style.transition = 'width ' + INTERVAL + 'ms linear';
@@ -724,45 +662,46 @@ function e($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'
     }
   }
 
-  /* ── Content swap with fade ── */
   function swapContent(index) {
     var s = SLIDES[index];
     [titleEl, textEl, ctaEl].forEach(function (el) {
+      if (!el) return;
       el.style.opacity = '0';
       el.style.transform = 'translateY(8px)';
       el.style.transition = 'opacity .35s ease, transform .35s ease';
     });
     setTimeout(function () {
-      titleEl.textContent = s.title;
-      textEl.textContent  = s.subtitle;
-      ctaEl.textContent   = s.cta;
-      ctaEl.href          = s.ctaLink;
-      counterEl.textContent = (index + 1) + ' / ' + SLIDES.length;
+      if (titleEl) titleEl.textContent = s.title;
+      if (textEl) textEl.textContent = s.subtitle;
+      if (ctaEl) {
+        ctaEl.textContent = s.cta;
+        ctaEl.href = s.ctaLink;
+      }
+      if (counterEl) counterEl.textContent = (index + 1) + ' / ' + SLIDES.length;
       [titleEl, textEl, ctaEl].forEach(function (el) {
-        el.style.opacity   = '1';
+        if (!el) return;
+        el.style.opacity = '1';
         el.style.transform = 'translateY(0)';
       });
     }, 320);
   }
 
-  /* ── Go to slide ── */
   function goTo(index) {
     if (index < 0) index = SLIDES.length - 1;
     if (index >= SLIDES.length) index = 0;
 
-    slideEls[current].classList.remove('active');
-    dotEls[current].classList.remove('active');
+    if (slideEls[current]) slideEls[current].classList.remove('active');
+    if (dotEls[current]) dotEls[current].classList.remove('active');
 
     current = index;
 
-    slideEls[current].classList.add('active');
-    dotEls[current].classList.add('active');
+    if (slideEls[current]) slideEls[current].classList.add('active');
+    if (dotEls[current]) dotEls[current].classList.add('active');
 
-    // Restart ken-burns by cloning the img inside
-    var imgEl = slideEls[current].querySelector('.slide-img');
+    var imgEl = slideEls[current]?.querySelector('.slide-img');
     if (imgEl) {
       imgEl.style.animation = 'none';
-      imgEl.offsetHeight; // reflow
+      imgEl.offsetHeight;
       imgEl.style.animation = '';
     }
 
@@ -771,15 +710,15 @@ function e($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'
     resetAutoplay();
   }
 
-  /* ── Autoplay ── */
   function resetAutoplay() {
     clearInterval(timer);
     timer = setInterval(function () { goTo(current + 1); }, INTERVAL);
   }
 
-  /* ── Controls ── */
-  document.getElementById('prev-btn').addEventListener('click', function () { goTo(current - 1); });
-  document.getElementById('next-btn').addEventListener('click', function () { goTo(current + 1); });
+  var prevBtn = document.getElementById('prev-btn');
+  var nextBtn = document.getElementById('next-btn');
+  if (prevBtn) prevBtn.addEventListener('click', function () { goTo(current - 1); });
+  if (nextBtn) nextBtn.addEventListener('click', function () { goTo(current + 1); });
 
   dotEls.forEach(function (dot) {
     dot.addEventListener('click', function () {
@@ -787,32 +726,27 @@ function e($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'
     });
   });
 
-  /* ── Pause on hover ── */
   var heroEl = document.getElementById('hero');
-  heroEl.addEventListener('mouseenter', function () { clearInterval(timer); });
-  heroEl.addEventListener('mouseleave', function () { resetAutoplay(); startProgress(); });
+  if (heroEl) {
+    heroEl.addEventListener('mouseenter', function () { clearInterval(timer); });
+    heroEl.addEventListener('mouseleave', function () { resetAutoplay(); startProgress(); });
+  }
 
-  /* ── Swipe support ── */
-  var touchStartX = 0;
-  heroEl.addEventListener('touchstart', function (e) { touchStartX = e.touches[0].clientX; }, { passive: true });
-  heroEl.addEventListener('touchend', function (e) {
-    var dx = e.changedTouches[0].clientX - touchStartX;
-    if (Math.abs(dx) > 40) goTo(dx < 0 ? current + 1 : current - 1);
-  }, { passive: true });
+  goTo(0);
+})();
+<?php endif; ?>
 
-  /* ── Mobile menu ── */
-  var hamburger   = document.getElementById('hamburger');
-  var mobileMenu  = document.getElementById('mobile-menu');
+// Mobile menu toggle
+var hamburger = document.getElementById('hamburger');
+var mobileMenu = document.getElementById('mobile-menu');
+if (hamburger && mobileMenu) {
   hamburger.addEventListener('click', function () {
     var open = mobileMenu.style.display === 'block';
     mobileMenu.style.display = open ? 'none' : 'block';
     hamburger.setAttribute('aria-expanded', String(!open));
     mobileMenu.setAttribute('aria-hidden', String(open));
   });
-
-  /* ── Bootstrap ── */
-  goTo(0);
-})();
+}
 </script>
 </body>
 </html>

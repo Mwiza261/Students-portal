@@ -9,18 +9,36 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'staff') {
 }
 
 $user_id = $_SESSION['user_id'];
-$full_name = $_SESSION['full_name'] ?? $_SESSION['username'];
-$current_page = basename($_SERVER['PHP_SELF']);
+$full_name = $_SESSION['full_name'] ?? $_SESSION['username'] ?? 'Staff';
 
-// Get unread messages count
-$unread_messages = 0;
 $mysqli = db_connect();
-$msg_query = "SELECT COUNT(*) as count FROM contact_messages WHERE status = 'unread'";
-$msg_result = $mysqli->query($msg_query);
-if ($msg_result && $msg_result->num_rows > 0) {
-    $unread_messages = $msg_result->fetch_assoc()['count'];
+$result = $mysqli->query("SELECT * FROM contact_messages ORDER BY created_at DESC");
+$messages = [];
+if ($result) {
+    $messages = $result->fetch_all(MYSQLI_ASSOC);
 }
 $mysqli->close();
+
+if (isset($_GET['mark_read'])) {
+    $id = intval($_GET['mark_read']);
+    $mysqli = db_connect();
+    $mysqli->query("UPDATE contact_messages SET status = 'read' WHERE id = $id");
+    $mysqli->close();
+    header('Location: admin_messages.php');
+    exit;
+}
+
+if (isset($_GET['delete'])) {
+    $id = intval($_GET['delete']);
+    $mysqli = db_connect();
+    $mysqli->query("DELETE FROM contact_messages WHERE id = $id");
+    $mysqli->close();
+    header('Location: admin_messages.php');
+    exit;
+}
+
+$unread_count = count(array_filter($messages, function($m) { return $m['status'] == 'unread'; }));
+$current_page = basename($_SERVER['PHP_SELF']);
 
 function isActive($page, $current) {
     return $page === $current ? 'active' : '';
@@ -35,7 +53,7 @@ function e($value) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Staff Dashboard | Chigoneka School</title>
+    <title>Contact Messages | Chigoneka School</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; }
@@ -150,42 +168,94 @@ function e($value) {
         .container {
             background: white;
             border-radius: 12px;
-            padding: 2rem;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-            text-align: center;
-        }
-
-        .welcome-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 2rem;
-            border-radius: 12px;
-            margin-bottom: 1.5rem;
-        }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1.5rem;
-            margin-top: 1.5rem;
-        }
-
-        .stat-card {
-            background: #f8fafc;
             padding: 1.5rem;
-            border-radius: 12px;
-            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
         }
 
-        .stat-card .number {
-            font-size: 2rem;
+        .stats {
+            background: #e8f5e9;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .stats span {
+            font-size: 24px;
             font-weight: bold;
             color: #1e6f5c;
         }
 
-        .stat-card .label {
-            color: #64748b;
-            margin-top: 0.5rem;
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        th {
+            background: #1e6f5c;
+            color: white;
+        }
+
+        tr:hover {
+            background: #f5f5f5;
+        }
+
+        .unread {
+            background: #fff3cd;
+            font-weight: bold;
+        }
+
+        .status {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+
+        .status-unread {
+            background: #ffc107;
+        }
+
+        .status-read {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn {
+            padding: 5px 10px;
+            margin: 0 2px;
+            text-decoration: none;
+            border-radius: 3px;
+            font-size: 12px;
+            display: inline-block;
+        }
+
+        .btn-read {
+            background: #007bff;
+            color: white;
+        }
+
+        .btn-read:hover {
+            background: #0056b3;
+        }
+
+        .btn-delete {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-delete:hover {
+            background: #c82333;
+        }
+
+        .message-preview {
+            max-width: 300px;
+            word-wrap: break-word;
         }
     </style>
 </head>
@@ -199,10 +269,10 @@ function e($value) {
         <div class="sidebar-nav">
             <div class="nav-section">
                 <div class="nav-section-title">MAIN</div>
-                <a href="StaffDashboard.php" class="active">📊 Dashboard</a>
-                <a href="admin_messages.php">💬 Messages
-                    <?php if ($unread_messages > 0): ?>
-                        <span class="badge"><?php echo $unread_messages; ?></span>
+                <a href="StaffDashboard.php">📊 Dashboard</a>
+                <a href="admin_messages.php" class="active">💬 Messages
+                    <?php if ($unread_count > 0): ?>
+                        <span class="badge"><?php echo $unread_count; ?></span>
                     <?php endif; ?>
                 </a>
             </div>
@@ -228,48 +298,59 @@ function e($value) {
     <div class="main-content">
         <div class="top-bar">
             <div class="page-title">
-                <h1>Welcome, <?php echo e($full_name); ?>!</h1>
-                <p>Staff Dashboard - Chigoneka School Management System</p>
+                <h1>Contact Messages</h1>
+                <p>View and manage messages from your website contact form</p>
             </div>
             <div class="user-avatar">
                 <?php echo strtoupper(substr($full_name, 0, 1)); ?>
             </div>
         </div>
 
-        <div class="welcome-card">
-            <h2>Welcome to Staff Portal</h2>
-            <p>Manage courses, timetables, student registrations, and more from this dashboard.</p>
-        </div>
-
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="number"><?php echo $unread_messages; ?></div>
-                <div class="label">Unread Messages</div>
-                <a href="admin_messages.php" style="display: inline-block; margin-top: 10px; color: #6366f1;">View Messages →</a>
-            </div>
-            <div class="stat-card">
-                <div class="number">📖</div>
-                <div class="label">Manage Courses</div>
-                <a href="manage_courses.php" style="display: inline-block; margin-top: 10px; color: #6366f1;">Go →</a>
-            </div>
-            <div class="stat-card">
-                <div class="number">👨‍🎓</div>
-                <div class="label">Manage Students</div>
-                <a href="manage_students.php" style="display: inline-block; margin-top: 10px; color: #6366f1;">Go →</a>
-            </div>
-            <div class="stat-card">
-                <div class="number">📅</div>
-                <div class="label">Timetable</div>
-                <a href="teacher_timetable.php" style="display: inline-block; margin-top: 10px; color: #6366f1;">Manage →</a>
-            </div>
-        </div>
-
         <div class="container">
-            <h3>Quick Navigation</h3>
-            <p>Use the sidebar to access different sections of the staff portal.</p>
-            <p style="margin-top: 1rem; color: #64748b;">
-                📧 For support, contact the system administrator
-            </p>
+            <div class="stats">
+                <span><?= count($messages) ?></span> total messages | 
+                <span><?= $unread_count ?></span> unread
+            </div>
+            
+            <?php if (count($messages) > 0): ?>
+            <div style="overflow-x: auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Phone</th>
+                            <th>Message</th>
+                            <th>Date</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($messages as $msg): ?>
+                        <tr class="<?= $msg['status'] == 'unread' ? 'unread' : '' ?>">
+                            <td><?= $msg['id'] ?></td>
+                            <td><?= e($msg['name']) ?></td>
+                            <td><?= e($msg['email']) ?></td>
+                            <td><?= e($msg['phone'] ?: 'N/A') ?></td>
+                            <td class="message-preview"><?= e(substr($msg['message'], 0, 100)) ?>...</td>
+                            <td><?= date('Y-m-d H:i', strtotime($msg['created_at'])) ?></td>
+                            <td><span class="status status-<?= $msg['status'] ?>"><?= $msg['status'] ?></span></td>
+                            <td>
+                                <?php if ($msg['status'] == 'unread'): ?>
+                                    <a href="?mark_read=<?= $msg['id'] ?>" class="btn btn-read">Mark Read</a>
+                                <?php endif; ?>
+                                <a href="?delete=<?= $msg['id'] ?>" class="btn btn-delete" onclick="return confirm('Delete this message?')">Delete</a>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <?php else: ?>
+                <p style="text-align: center; padding: 40px; color: #999;">No messages yet. Check back later.</p>
+            <?php endif; ?>
         </div>
     </div>
 </body>

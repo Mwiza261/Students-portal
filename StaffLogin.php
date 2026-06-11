@@ -5,9 +5,14 @@ require_once __DIR__ . '/db.php';
 $loginError   = '';
 $loginSuccess = false;
 
+// Check for saved cookies
+$saved_username = $_COOKIE['saved_username'] ?? '';
+$saved_password = $_COOKIE['saved_password'] ?? '';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = trim($_POST['username'] ?? '');
     $password = $_POST['password'] ?? '';
+    $remember_me = isset($_POST['remember_me']) ? true : false;
 
     if ($username === '' || $password === '') {
         $loginError = 'Please enter both username and password.';
@@ -30,7 +35,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['login_time']    = time();
             $loginSuccess              = true;
             
-            // Redirect to StaffDashboard.php after successful login
+            // Handle Remember Me
+            if ($remember_me) {
+                // Set cookies for 30 days
+                setcookie('saved_username', $username, time() + (86400 * 30), "/", "", false, true);
+                setcookie('saved_password', $password, time() + (86400 * 30), "/", "", false, true);
+            } else {
+                // Clear cookies if not remembering
+                setcookie('saved_username', '', time() - 3600, "/");
+                setcookie('saved_password', '', time() - 3600, "/");
+            }
+            
+            // ✅ CORRECT - Redirect to StaffDashboard.php after successful login
             header('Location: StaffDashboard.php');
             exit;
         }
@@ -155,6 +171,7 @@ function e($v): string {
 
         .alert svg { width: 18px; height: 18px; flex-shrink: 0; margin-top: 1px; }
         .alert-error { background: rgba(248,113,113,0.1); color: #fca5a5; border: 1px solid rgba(248,113,113,0.2); }
+        .alert-verifying { background: rgba(99,102,241,0.1); color: #a5b4fc; border: 1px solid rgba(99,102,241,0.2); }
 
         .btn-submit {
             width: 100%;
@@ -172,6 +189,38 @@ function e($v): string {
         }
 
         .btn-submit:hover { opacity: 0.9; transform: translateY(-1px); }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 1rem 0 0.5rem;
+        }
+
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            color: #94a3b8;
+        }
+
+        .checkbox-label input {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+            accent-color: #6366f1;
+        }
+
+        .forgot-link {
+            color: #818cf8;
+            font-size: 0.8rem;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .forgot-link:hover { color: #a5b4fc; text-decoration: underline; }
 
         .links {
             margin-top: 1.25rem;
@@ -195,6 +244,13 @@ function e($v): string {
 
         .card-footer a { color: #818cf8; text-decoration: none; font-weight: 500; }
         .card-footer a:hover { color: #a5b4fc; }
+
+        .verifying-text {
+            font-size: 0.75rem;
+            color: #64748b;
+            margin-top: 0.5rem;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
@@ -202,6 +258,13 @@ function e($v): string {
     <div class="logo">CS</div>
     <h1>Staff Login</h1>
     <p class="subtitle">Enter your username and password to access the staff portal.</p>
+
+    <div class="alert alert-verifying" id="verifyingBanner" style="display: none;">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+        </svg>
+        <span>Verifying credentials... <span id="dots"></span></span>
+    </div>
 
     <?php if ($loginError): ?>
         <div class="alert alert-error">
@@ -212,7 +275,7 @@ function e($v): string {
         </div>
     <?php endif; ?>
 
-    <form method="post" action="StaffLogin.php" novalidate>
+    <form method="post" action="StaffLogin.php" novalidate id="loginForm">
         <div class="field">
             <label for="username">Username</label>
             <div class="input-wrap">
@@ -225,6 +288,7 @@ function e($v): string {
                     name="username"
                     placeholder="e.g. john.banda"
                     autocomplete="username"
+                    value="<?php echo e($saved_username); ?>"
                     required
                 >
             </div>
@@ -243,6 +307,7 @@ function e($v): string {
                     name="password"
                     placeholder="Your password"
                     autocomplete="current-password"
+                    value="<?php echo e($saved_password); ?>"
                     required
                 >
                 <button type="button" class="toggle-pw" onclick="togglePw()" aria-label="Show password">
@@ -254,12 +319,19 @@ function e($v): string {
             </div>
         </div>
 
-        <button type="submit" class="btn-submit">Sign In</button>
+        <div class="checkbox-group">
+            <label class="checkbox-label">
+                <input type="checkbox" name="remember_me" <?php echo (!empty($saved_username) && !empty($saved_password)) ? 'checked' : ''; ?>>
+                <span>Remember me</span>
+            </label>
+            <a href="#" class="forgot-link">Forgot password?</a>
+        </div>
+
+        <button type="submit" class="btn-submit" id="signInBtn">Sign In</button>
     </form>
     
     <div class="links">
         <a href="staffregister.php">Create an account</a>
-        <a href="#">Forgot password?</a>
     </div>
 
     <div class="card-footer">
@@ -271,6 +343,46 @@ function e($v): string {
 function togglePw() {
     const input = document.getElementById('password');
     input.type = input.type === 'password' ? 'text' : 'password';
+}
+
+let dotInterval = null;
+let dotCount = 0;
+
+function startDots() {
+    dotCount = 0;
+    if (dotInterval) clearInterval(dotInterval);
+    dotInterval = setInterval(function() {
+        dotCount = (dotCount + 1) % 4;
+        let dots = '';
+        for (let i = 0; i < dotCount; i++) dots += '.';
+        const dotsSpan = document.getElementById('dots');
+        if (dotsSpan) dotsSpan.textContent = dots;
+    }, 500);
+}
+
+function stopDots() {
+    if (dotInterval) {
+        clearInterval(dotInterval);
+        dotInterval = null;
+    }
+}
+
+const form = document.getElementById('loginForm');
+const signInBtn = document.getElementById('signInBtn');
+const verifyingBanner = document.getElementById('verifyingBanner');
+
+if (form) {
+    form.addEventListener('submit', function(e) {
+        const username = document.getElementById('username').value.trim();
+        const password = document.getElementById('password').value;
+        
+        if (username !== '' && password !== '') {
+            signInBtn.disabled = true;
+            signInBtn.textContent = 'Signing in...';
+            verifyingBanner.style.display = 'flex';
+            startDots();
+        }
+    });
 }
 </script>
 </body>
