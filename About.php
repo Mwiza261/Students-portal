@@ -1,346 +1,505 @@
+<?php
+require_once __DIR__ . '/db.php';
+
+function page_count(mysqli $mysqli, string $sql): int
+{
+    $result = $mysqli->query($sql);
+    if ($result && ($row = $result->fetch_row())) {
+        return (int) $row[0];
+    }
+
+    return 0;
+}
+
+$school_name = 'Chigoneka School';
+$school_tagline = 'Learning, discipline, and growth for every student.';
+$school_intro = 'Chigoneka School is committed to delivering quality education, strong values, and a supportive learning environment for students and staff.';
+$school_address = 'Lilongwe, Malawi';
+$school_phone = '+265 999 000 111';
+$school_email = 'info@chigoneka.edu.mw';
+
+$metrics = [
+    'students' => 0,
+    'staff' => 0,
+    'teachers' => 0,
+    'courses' => 0,
+    'registrations' => 0,
+    'messages' => 0,
+];
+$latest_notices = [];
+$popular_courses = [];
+$db_error = null;
+
+try {
+    $mysqli = db_connect();
+
+    if ($mysqli->query("SHOW TABLES LIKE 'users'") && $mysqli->query("SHOW TABLES LIKE 'users'")->num_rows > 0) {
+        $metrics['students'] = page_count($mysqli, "SELECT COUNT(*) FROM users WHERE role = 'student'");
+        $metrics['staff'] = page_count($mysqli, "SELECT COUNT(*) FROM users WHERE role = 'staff'");
+        $metrics['teachers'] = page_count($mysqli, "SELECT COUNT(*) FROM users WHERE role = 'teacher'");
+    }
+
+    if ($mysqli->query("SHOW TABLES LIKE 'courses'") && $mysqli->query("SHOW TABLES LIKE 'courses'")->num_rows > 0) {
+        $metrics['courses'] = page_count($mysqli, 'SELECT COUNT(*) FROM courses');
+
+        $courses_result = $mysqli->query(
+            'SELECT course_code, course_name, current_students
+             FROM courses
+             ORDER BY current_students DESC, course_name ASC
+             LIMIT 4'
+        );
+        if ($courses_result) {
+            while ($row = $courses_result->fetch_assoc()) {
+                $popular_courses[] = $row;
+            }
+        }
+    }
+
+    if ($mysqli->query("SHOW TABLES LIKE 'student_courses'") && $mysqli->query("SHOW TABLES LIKE 'student_courses'")->num_rows > 0) {
+        $metrics['registrations'] = page_count($mysqli, "SELECT COUNT(*) FROM student_courses WHERE status = 'registered'");
+    }
+
+    if ($mysqli->query("SHOW TABLES LIKE 'contact_messages'") && $mysqli->query("SHOW TABLES LIKE 'contact_messages'")->num_rows > 0) {
+        $metrics['messages'] = page_count($mysqli, "SELECT COUNT(*) FROM contact_messages");
+    }
+
+    if ($mysqli->query("SHOW TABLES LIKE 'notices'") && $mysqli->query("SHOW TABLES LIKE 'notices'")->num_rows > 0) {
+        $notice_result = $mysqli->query(
+            'SELECT title, body, created_at
+             FROM notices
+             ORDER BY created_at DESC
+             LIMIT 3'
+        );
+        if ($notice_result) {
+            while ($row = $notice_result->fetch_assoc()) {
+                $latest_notices[] = $row;
+            }
+        }
+    }
+
+    $mysqli->close();
+} catch (Throwable $e) {
+    $db_error = 'Database content is temporarily unavailable.';
+}
+
+function e($value): string
+{
+    return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>About Us | Lilongwe · Area 47 | Central Region Capital</title>
-    <!-- Google Fonts & simple reset for clean typography -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,600;14..32,700&display=swap" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>About Us | Chigoneka School</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Inter', sans-serif;
-            background: #f4f7fc;
-            color: #1f2a3e;
-            line-height: 1.5;
-            scroll-behavior: smooth;
-        }
-
-        /* subtle warm accent inspired by malawi landscape */
         :root {
-            --primary: #1e6f5c;
-            --primary-dark: #0f4c3f;
-            --accent-gold: #e6b422;
-            --light-bg: #ffffff;
-            --shadow-sm: 0 8px 20px rgba(0, 0, 0, 0.03), 0 2px 6px rgba(0, 0, 0, 0.05);
-            --border-light: #e2edf2;
+            --bg: #f0f2f5;
+            --navy: #1a3a6b;
+            --navy-2: #12295a;
+            --navy-3: #2250a0;
+            --gold: #c9a84c;
+            --gold-2: #e8c86a;
+            --surface: #ffffff;
+            --surface-soft: #f8fafc;
+            --border: #dbe3ef;
+            --text: #10233d;
+            --muted: #64748b;
+            --shadow: 0 20px 50px rgba(15, 35, 61, 0.08);
+            --shadow-soft: 0 10px 30px rgba(15, 35, 61, 0.06);
         }
 
-        /* container & layout */
-        .container {
-            max-width: 1280px;
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+            background: radial-gradient(circle at top left, rgba(201, 168, 76, 0.14), transparent 26%), linear-gradient(180deg, #f7f9fc 0%, var(--bg) 100%);
+            color: var(--text);
+            line-height: 1.55;
+        }
+        a { color: inherit; text-decoration: none; }
+
+        .page-shell {
+            max-width: 1180px;
             margin: 0 auto;
-            padding: 2rem 1.5rem 3rem;
-        }
-
-        /* header / nav placeholder (simple but elegant) */
-        .page-header {
-            text-align: center;
-            margin-bottom: 2rem;
-            border-bottom: 1px solid var(--border-light);
-            padding-bottom: 1rem;
-        }
-
-        .page-header h1 {
-            font-size: 2.4rem;
-            font-weight: 700;
-            letter-spacing: -0.3px;
-            background: linear-gradient(135deg, #1e6f5c 0%, #2c8a73 100%);
-            background-clip: text;
-            -webkit-background-clip: text;
-            color: transparent;
-            display: inline-block;
-        }
-
-        .page-header .tagline {
-            color: #4b5e77;
-            margin-top: 0.5rem;
-            font-weight: 400;
-        }
-
-        /* about card grid */
-        .about-grid {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 2rem;
-            margin-top: 1.5rem;
-        }
-
-        .main-content {
-            flex: 2;
-            min-width: 260px;
-        }
-
-        .info-card {
-            flex: 1.2;
-            min-width: 260px;
-        }
-
-        /* cards */
-        .card {
-            background: var(--light-bg);
-            border-radius: 28px;
-            box-shadow: var(--shadow-sm);
-            padding: 1.8rem;
-            margin-bottom: 2rem;
-            border: 1px solid var(--border-light);
-            transition: transform 0.2s ease, box-shadow 0.2s;
-        }
-
-        .card:hover {
-            box-shadow: 0 20px 30px -12px rgba(0, 0, 0, 0.1);
-        }
-
-        .card h2 {
-            font-size: 1.6rem;
-            font-weight: 600;
-            margin-bottom: 1rem;
-            border-left: 5px solid var(--primary);
-            padding-left: 1rem;
-            color: #1e2f41;
-        }
-
-        .card h3 {
-            font-size: 1.2rem;
-            font-weight: 600;
-            margin: 1.2rem 0 0.5rem;
-            color: var(--primary-dark);
-        }
-
-        .intro-text {
-            font-size: 1.05rem;
-            margin-bottom: 1rem;
-            color: #2c3e4e;
-        }
-
-        /* location highlight */
-        .location-block {
-            background: #eef3f0;
-            border-radius: 24px;
             padding: 1.5rem;
-            margin: 1.5rem 0;
-            border-left: 5px solid var(--accent-gold);
         }
 
-        .location-block p {
-            margin: 0.5rem 0;
+        .hero {
+            background: linear-gradient(135deg, var(--navy) 0%, var(--navy-3) 100%);
+            color: #fff;
+            border-radius: 28px;
+            padding: 2rem;
+            box-shadow: var(--shadow);
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 1.4rem;
+        }
+
+        .hero::after {
+            content: '';
+            position: absolute;
+            right: -40px;
+            top: -40px;
+            width: 180px;
+            height: 180px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(201, 168, 76, 0.18), transparent 70%);
+        }
+
+        .hero-top {
             display: flex;
             align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            flex-wrap: wrap;
+            position: relative;
+            z-index: 1;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .brand-mark {
+            width: 56px;
+            height: 56px;
+            border-radius: 16px;
+            background: linear-gradient(135deg, var(--gold) 0%, var(--gold-2) 100%);
+            color: var(--navy);
+            display: grid;
+            place-items: center;
+            font-weight: 800;
+            box-shadow: 0 14px 24px rgba(201, 168, 76, 0.25);
+        }
+
+        .brand h1 {
+            font-family: 'Playfair Display', serif;
+            font-size: clamp(2rem, 4vw, 3.1rem);
+            line-height: 1.05;
+            margin-bottom: 0.35rem;
+        }
+
+        .brand p {
+            color: rgba(255, 255, 255, 0.78);
+            max-width: 680px;
+        }
+
+        .hero-actions {
+            display: flex;
             gap: 0.75rem;
             flex-wrap: wrap;
         }
 
-        .location-icon {
-            font-size: 1.4rem;
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.8rem 1.15rem;
+            border-radius: 999px;
+            font-weight: 700;
+            transition: transform 0.2s ease, background 0.2s ease;
         }
 
-        .badge {
-            background: var(--primary);
-            color: white;
-            border-radius: 60px;
-            padding: 0.2rem 0.9rem;
-            font-size: 0.8rem;
-            font-weight: 500;
-            display: inline-block;
-            margin-right: 0.6rem;
+        .btn:hover { transform: translateY(-1px); }
+        .btn-primary { background: var(--gold); color: var(--navy); }
+        .btn-secondary { background: rgba(255, 255, 255, 0.1); color: #fff; border: 1px solid rgba(255, 255, 255, 0.16); }
+
+        .content-grid {
+            display: grid;
+            grid-template-columns: 1.45fr 0.95fr;
+            gap: 1.4rem;
         }
 
-        .contact-simple {
-            margin-top: 1rem;
-            padding-top: 1rem;
-            border-top: 1px dashed var(--border-light);
+        .card {
+            background: var(--surface);
+            border: 1px solid rgba(219, 227, 239, 0.9);
+            border-radius: 24px;
+            box-shadow: var(--shadow-soft);
+            padding: 1.35rem;
         }
 
-        /* feature list */
-        .feature-list {
-            list-style: none;
-            margin-top: 0.8rem;
+        .section-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.45rem;
+            color: var(--navy);
+            margin-bottom: 0.9rem;
         }
 
-        .feature-list li {
-            margin-bottom: 0.75rem;
-            display: flex;
-            align-items: baseline;
-            gap: 0.6rem;
+        .intro {
+            color: var(--muted);
+            margin-bottom: 1rem;
         }
 
-        .feature-list li::before {
-            content: "📍";
-            font-size: 1rem;
-            color: var(--primary);
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.9rem;
+            margin-top: 1.1rem;
         }
 
-        hr {
-            margin: 1rem 0;
-            border: 0;
-            height: 1px;
-            background: linear-gradient(to right, #cbdde6, transparent);
-        }
-
-        /* stats/mini highlights */
-        .stat-grid {
-            display: flex;
-            justify-content: space-between;
-            gap: 1rem;
-            margin: 1rem 0;
-            flex-wrap: wrap;
-        }
-
-        .stat-item {
-            background: #f9fdfb;
+        .metric {
             border-radius: 18px;
-            padding: 0.8rem;
-            text-align: center;
-            flex: 1;
+            padding: 1rem;
+            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+            border: 1px solid var(--border);
         }
 
-        /* responsiveness */
-        @media (max-width: 780px) {
-            .container {
-                padding: 1.2rem;
-            }
-            .card h2 {
-                font-size: 1.4rem;
-            }
-            .page-header h1 {
-                font-size: 2rem;
-            }
+        .metric .value {
+            font-size: 1.9rem;
+            font-weight: 800;
+            color: var(--navy);
+            line-height: 1;
         }
 
-        /* footer style */
+        .metric .label {
+            margin-top: 0.25rem;
+            color: var(--muted);
+            font-size: 0.88rem;
+        }
+
+        .highlight-box {
+            margin-top: 1rem;
+            padding: 1rem;
+            border-radius: 18px;
+            background: linear-gradient(135deg, rgba(26, 58, 107, 0.06), rgba(201, 168, 76, 0.12));
+            border: 1px solid rgba(26, 58, 107, 0.08);
+        }
+
+        .list {
+            list-style: none;
+            display: grid;
+            gap: 0.7rem;
+            margin-top: 0.85rem;
+        }
+
+        .list li {
+            display: flex;
+            gap: 0.7rem;
+            align-items: flex-start;
+            color: var(--muted);
+        }
+
+        .list li::before {
+            content: '•';
+            color: var(--gold);
+            font-size: 1.2rem;
+            line-height: 1;
+            margin-top: -0.08rem;
+        }
+
+        .info-grid {
+            display: grid;
+            gap: 0.9rem;
+        }
+
+        .pill-row {
+            display: flex;
+            gap: 0.6rem;
+            flex-wrap: wrap;
+            margin-top: 0.9rem;
+        }
+
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.35rem 0.75rem;
+            border-radius: 999px;
+            background: #eef2ff;
+            color: #3730a3;
+            font-size: 0.82rem;
+            font-weight: 700;
+        }
+
+        .notice {
+            border-radius: 18px;
+            padding: 0.95rem 1rem;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+        }
+
+        .notice h3 {
+            font-size: 1rem;
+            color: var(--navy);
+            margin-bottom: 0.35rem;
+        }
+
+        .notice .date {
+            font-size: 0.75rem;
+            color: #94a3b8;
+            margin-top: 0.35rem;
+        }
+
+        .split-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 1.4rem;
+            margin-top: 1.4rem;
+        }
+
+        .contact-card {
+            background: linear-gradient(135deg, var(--navy) 0%, var(--navy-2) 100%);
+            color: #fff;
+        }
+
+        .contact-card .section-title,
+        .contact-card .intro,
+        .contact-card li {
+            color: rgba(255, 255, 255, 0.88);
+        }
+
+        .contact-card .section-title { color: #fff; }
+        .contact-card .pill { background: rgba(255,255,255,0.12); color: #fff; }
+
         .footer-note {
-            margin-top: 3rem;
             text-align: center;
-            font-size: 0.85rem;
-            color: #6c86a3;
-            border-top: 1px solid var(--border-light);
-            padding-top: 1.5rem;
+            color: var(--muted);
+            font-size: 0.88rem;
+            margin: 1.5rem 0 0.5rem;
+            padding-top: 1rem;
         }
 
-        .btn-outline {
-            display: inline-block;
-            background: transparent;
-            border: 1.5px solid var(--primary);
-            color: var(--primary-dark);
-            padding: 0.5rem 1.2rem;
-            border-radius: 40px;
-            text-decoration: none;
-            font-weight: 500;
-            transition: all 0.2s;
-            margin-top: 0.8rem;
+        .error-box {
+            margin-bottom: 1rem;
+            padding: 0.9rem 1rem;
+            border-radius: 16px;
+            background: #fef2f2;
+            color: #991b1b;
+            border: 1px solid #fecaca;
         }
 
-        .btn-outline:hover {
-            background: var(--primary);
-            color: white;
+        @media (max-width: 900px) {
+            .content-grid,
+            .split-grid,
+            .metrics-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .page-shell { padding: 1rem; }
+            .hero { padding: 1.4rem; border-radius: 22px; }
+            .card { padding: 1.1rem; border-radius: 20px; }
+            .hero-actions { width: 100%; }
+            .btn { width: 100%; }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <!-- header section -->
-        <div class="page-header">
-            <h1>About us · Mzindawathu</h1>
-            <div class="tagline">Rooted in Malawi's heart — serving with purpose</div>
-        </div>
-
-        <div class="about-grid">
-            <!-- left side: core narrative -->
-            <div class="main-content">
-                <div class="card">
-                    <h2>Our story</h2>
-                    <p class="intro-text">Founded and operated from the vibrant capital city, Lilongwe — specifically Area 47 — we blend innovation with community. Our journey began in the central region, embracing the energy of Malawi's political and cultural heartbeat.</p>
-                    <p>We are a collective of thinkers, creators, and problem-solvers dedicated to delivering quality digital solutions, authentic services, and local impact. Being positioned in Area 47 gives us a unique vantage point: close to key infrastructure, yet deeply connected to the neighbourhood rhythm that defines Lilongwe's spirit.</p>
-                    
-                    <!-- location explicit block (main narrative) -->
-                    <div class="location-block">
-                        <p><span class="location-icon">📍</span> <strong>Our homebase:</strong> <span style="font-weight:600;">Lilongwe, Area 47</span> — Central Region, Capital City, Malawi</p>
-                        <p><span class="location-icon">🏛️</span> From the political hub to local enterprises, we serve clients across the central region and beyond.</p>
-                        <p><span class="location-icon">🌍</span> Area 47 represents innovation, accessibility and the future of local tech & creative industries.</p>
+    <div class="page-shell">
+        <section class="hero">
+            <div class="hero-top">
+                <div class="brand">
+                    <div class="brand-mark">CS</div>
+                    <div>
+                        <h1>About <?php echo e($school_name); ?></h1>
+                        <p><?php echo e($school_tagline); ?></p>
                     </div>
-                    
-                    <h3>What drives us</h3>
-                    <p>We believe that location matters. Operating directly from Lilongwe's central district means we understand the local market, the infrastructure nuances, and the opportunities that arise from being in the country’s administrative and economic centre. Whether it’s collaboration with city stakeholders or reaching out to rural communities, Area 47 is our strategic anchor.</p>
-                    <div class="stat-grid">
-                        <div class="stat-item">✔️ 100% local team</div>
-                        <div class="stat-item">✔️ Central region focused</div>
-                        <div class="stat-item">✔️ Capital city presence</div>
-                    </div>
-                    <a href="#" class="btn-outline" aria-label="Learn more about our mission">Learn more →</a>
                 </div>
-                
-                <div class="card">
-                    <h2>Why Lilongwe · Area 47</h2>
-                    <p>Area 47 is more than a postal address — it’s a dynamic corridor in the capital. Being located here allows us to engage with grassroots initiatives, government agencies, NGOs, and private partners who share the same urban landscape. The central region acts as a bridge between the northern and southern territories, and we harness that connectivity.</p>
-                    <ul class="feature-list">
-                        <li>Strategic accessibility to downtown Lilongwe</li>
-                        <li>Close to major transport routes & business districts</li>
-                        <li>Hub of emerging tech and creative spaces</li>
-                        <li>Authentic community relationships built over years</li>
+                <div class="hero-actions">
+                    <a class="btn btn-primary" href="contact.php">Contact Us</a>
+                    <a class="btn btn-secondary" href="index.php">Back to Home</a>
+                </div>
+            </div>
+        </section>
+
+        <?php if ($db_error): ?>
+            <div class="error-box"><?php echo e($db_error); ?></div>
+        <?php endif; ?>
+
+        <div class="content-grid">
+            <section class="card">
+                <h2 class="section-title">Our Story</h2>
+                <p class="intro"><?php echo e($school_intro); ?></p>
+                <p>We support students through academic growth, discipline, and practical learning. The portal is connected to live school data so students, staff, and administrators can see up-to-date information about courses, registrations, and announcements.</p>
+
+                <div class="metrics-grid">
+                    <div class="metric">
+                        <div class="value"><?php echo (int) $metrics['students']; ?></div>
+                        <div class="label">Students</div>
+                    </div>
+                    <div class="metric">
+                        <div class="value"><?php echo (int) $metrics['courses']; ?></div>
+                        <div class="label">Courses</div>
+                    </div>
+                    <div class="metric">
+                        <div class="value"><?php echo (int) $metrics['registrations']; ?></div>
+                        <div class="label">Active Registrations</div>
+                    </div>
+                </div>
+
+                <div class="highlight-box">
+                    <strong>What drives us</strong>
+                    <ul class="list">
+                        <li>Quality teaching and strong academic support</li>
+                        <li>Clear communication between students, teachers, and staff</li>
+                        <li>Real-time school records from the database</li>
                     </ul>
                 </div>
-            </div>
+            </section>
 
-            <!-- right side: location summary + contact / direct details -->
-            <div class="info-card">
-                <div class="card">
-                    <h2>📍 Headquarters</h2>
-                    <div style="background:#f1f5f9; border-radius: 20px; padding: 0.2rem 0.8rem; margin-bottom: 1rem;">
-                        <p style="font-weight: 700; margin:0.6rem 0;">Lilongwe, Area 47</p>
-                        <p style="font-size:0.9rem;">Central Region, Capital City, Malawi</p>
+            <aside class="card info-grid">
+                <div>
+                    <h2 class="section-title">School Snapshot</h2>
+                    <div class="pill-row">
+                        <span class="pill"><?php echo (int) $metrics['staff']; ?> Staff</span>
+                        <span class="pill"><?php echo (int) $metrics['teachers']; ?> Teachers</span>
+                        <span class="pill"><?php echo (int) $metrics['messages']; ?> Messages</span>
                     </div>
-                    <p><strong>🗺️ Exact location:</strong> Area 47, along the capital's central corridor, near major landmarks and community centers.</p>
-                    <hr>
-                    <h3>Contact & presence</h3>
-                    <p>📞 +265 (0) 123 456 789 <br> ✉️ hello@area47hub.mw</p>
-                    <p>🕒 Mon–Fri: 08:00 – 17:00 (CAT)</p>
-                    <div class="contact-simple">
-                        <span class="badge">Central region</span>
-                        <span class="badge" style="background: #e6b422; color:#2d2b1f;">Capital city</span>
-                        <span class="badge" style="background: #2c5a4a;">Area 47 hub</span>
-                    </div>
-                </div>
-                
-                <div class="card">
-                    <h2>🌟 Regional footprint</h2>
-                    <p>Our operations extend across the central region, but our roots remain firmly planted in Lilongwe — the capital city. From Area 47 we coordinate initiatives that touch:</p>
-                    <ul style="margin-top: 0.8rem; list-style-type: none; padding-left: 0;">
-                        <li style="margin-bottom: 0.4rem;">✓ Lilongwe City Council partnerships</li>
-                        <li style="margin-bottom: 0.4rem;">✓ Central region innovation clusters</li>
-                        <li style="margin-bottom: 0.4rem;">✓ Cross-sector collaboration (Dowa, Dedza, Salima)</li>
-                        <li style="margin-bottom: 0.4rem;">✓ Community empowerment programs</li>
+                    <ul class="list">
+                        <li><strong>Address:</strong> <?php echo e($school_address); ?></li>
+                        <li><strong>Phone:</strong> <?php echo e($school_phone); ?></li>
+                        <li><strong>Email:</strong> <?php echo e($school_email); ?></li>
                     </ul>
                 </div>
+            </aside>
+        </div>
 
-                <div class="card">
-                    <h2>📌 Quick facts</h2>
-                    <p><strong>Capital:</strong> Lilongwe <br> <strong>Zone:</strong> Area 47 <br> <strong>Region:</strong> Central Malawi <br> <strong>Since:</strong> 2019</p>
-                    <p style="margin-top: 1rem; font-size: 0.9rem; background: #fef7e0; padding: 0.7rem; border-radius: 16px;">✨ “We don’t just operate in the capital — we shape solutions from the heart of the central region, Area 47.”</p>
+        <div class="split-grid">
+            <section class="card">
+                <h2 class="section-title">Latest Notices</h2>
+                <?php if (!empty($latest_notices)): ?>
+                    <div class="info-grid">
+                        <?php foreach ($latest_notices as $notice): ?>
+                            <div class="notice">
+                                <h3><?php echo e($notice['title']); ?></h3>
+                                <p><?php echo e(mb_strimwidth($notice['body'], 0, 180, '...')); ?></p>
+                                <div class="date"><?php echo e(date('d M Y', strtotime($notice['created_at']))); ?></div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php else: ?>
+                    <p class="intro">No notices have been posted yet.</p>
+                <?php endif; ?>
+            </section>
+
+            <section class="card contact-card">
+                <h2 class="section-title">Popular Courses</h2>
+                <?php if (!empty($popular_courses)): ?>
+                    <ul class="list">
+                        <?php foreach ($popular_courses as $course): ?>
+                            <li>
+                                <span><strong><?php echo e($course['course_code']); ?></strong> - <?php echo e($course['course_name']); ?><?php if (isset($course['current_students'])): ?> (<?php echo (int) $course['current_students']; ?> students)<?php endif; ?></span>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php else: ?>
+                    <p class="intro">Course data will appear here once courses are created in the database.</p>
+                <?php endif; ?>
+
+                <div class="pill-row">
+                    <span class="pill">Live database</span>
+                    <span class="pill">School records</span>
+                    <span class="pill">Current notices</span>
                 </div>
-            </div>
+            </section>
         </div>
 
-        <!-- additional micro section: directions / local flavour -->
-        <div style="margin-top: 1.5rem; display: flex; flex-wrap: wrap; gap: 1rem; justify-content: space-between;">
-            <div style="flex:1; background:#FFFFFF; border-radius: 24px; padding: 1.3rem; border:1px solid #e2edf2;">
-                <h3 style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">🚗 Getting here (Area 47)</h3>
-                <p>Located just off the main M1 road that traverses Lilongwe, Area 47 is easily accessible from the city centre and the Kamuzu International Airport corridor. Our neighbours include local markets, green spaces and collaborative workspaces.</p>
-            </div>
-            <div style="flex:1; background:#FFFFFF; border-radius: 24px; padding: 1.3rem; border:1px solid #e2edf2;">
-                <h3 style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">🤝 Community commitment</h3>
-                <p>From Area 47 to the wider central region, we actively invest in local talent, digital literacy workshops, and sustainable initiatives that mirror the resilience of Malawi's capital city.</p>
-            </div>
-        </div>
-
-        <!-- footer note including location echo -->
         <div class="footer-note">
-            <p>📍 Lilongwe, Area 47 | Central Region | Capital City of Malawi — where purpose meets place.<br>
-            &copy; 2025 Area47 Hub — rooted in the heart of the nation.</p>
+            Connected to the school database and showing live portal data.
         </div>
     </div>
 </body>

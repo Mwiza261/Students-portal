@@ -6,8 +6,8 @@ $loginError   = '';
 $loginSuccess = false;
 
 // Check for saved cookies
-$saved_username = $_COOKIE['saved_username'] ?? '';
-$saved_password = $_COOKIE['saved_password'] ?? '';
+$saved_username = $_COOKIE['saved_staff_username'] ?? '';
+$saved_password = $_COOKIE['saved_staff_password'] ?? '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = trim($_POST['username'] ?? '');
@@ -22,7 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$user || !password_verify($password, $user['password_hash'])) {
             $loginError = 'Invalid username or password.';
         } else {
-            session_regenerate_id(true); // Prevent session fixation
+            session_regenerate_id(true);
             $_SESSION['authenticated'] = true;
             $_SESSION['user_id']       = $user['id'];
             $_SESSION['username']      = $user['username'];
@@ -35,18 +35,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['login_time']    = time();
             $loginSuccess              = true;
             
-            // Handle Remember Me
             if ($remember_me) {
-                // Set cookies for 30 days
-                setcookie('saved_username', $username, time() + (86400 * 30), "/", "", false, true);
-                setcookie('saved_password', $password, time() + (86400 * 30), "/", "", false, true);
+                setcookie('saved_staff_username', $username, time() + (86400 * 30), "/", "", false, true);
+                setcookie('saved_staff_password', $password, time() + (86400 * 30), "/", "", false, true);
+                setcookie('saved_username', '', time() - 3600, "/");
+                setcookie('saved_password', '', time() - 3600, "/");
             } else {
-                // Clear cookies if not remembering
+                setcookie('saved_staff_username', '', time() - 3600, "/");
+                setcookie('saved_staff_password', '', time() - 3600, "/");
                 setcookie('saved_username', '', time() - 3600, "/");
                 setcookie('saved_password', '', time() - 3600, "/");
             }
             
-            // ✅ CORRECT - Redirect to StaffDashboard.php after successful login
             header('Location: StaffDashboard.php');
             exit;
         }
@@ -73,25 +73,25 @@ function e($v): string {
             align-items: center;
             justify-content: center;
             padding: 2rem 1rem;
-            background: radial-gradient(circle at top, #1e293b 0%, #020617 60%);
+            background: linear-gradient(135deg, #f5f7fa 0%, #e4e8f0 100%);
             font-family: 'Inter', system-ui, -apple-system, sans-serif;
-            color: #e2e8f0;
+            color: #1e293b;
         }
 
         .card {
             width: min(420px, 100%);
-            background: rgba(15,23,42,0.96);
-            border: 1px solid rgba(148,163,184,0.15);
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
             border-radius: 24px;
             padding: 2.25rem 2.5rem;
-            box-shadow: 0 32px 80px rgba(2,6,23,0.5);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.08);
         }
 
         .logo {
             width: 46px;
             height: 46px;
             border-radius: 12px;
-            background: #6366f1;
+            background: #1a3a6b;
             display: grid;
             place-items: center;
             font-size: 1.1rem;
@@ -100,7 +100,7 @@ function e($v): string {
             margin-bottom: 1.25rem;
         }
 
-        h1 { margin: 0 0 0.35rem; font-size: 1.6rem; font-weight: 700; color: #f8fafc; }
+        h1 { margin: 0 0 0.35rem; font-size: 1.6rem; font-weight: 700; color: #1a3a6b; }
 
         .subtitle { margin: 0 0 1.75rem; font-size: 0.875rem; color: #64748b; line-height: 1.6; }
 
@@ -109,8 +109,8 @@ function e($v): string {
         .field label {
             display: block;
             font-size: 0.8rem;
-            font-weight: 500;
-            color: #94a3b8;
+            font-weight: 600;
+            color: #334155;
             margin-bottom: 0.45rem;
         }
 
@@ -121,7 +121,7 @@ function e($v): string {
             left: 0.9rem;
             width: 16px;
             height: 16px;
-            color: #475569;
+            color: #94a3b8;
             pointer-events: none;
         }
 
@@ -129,20 +129,20 @@ function e($v): string {
             width: 100%;
             padding: 0.85rem 1rem 0.85rem 2.5rem;
             border-radius: 12px;
-            border: 1.5px solid rgba(148,163,184,0.15);
-            background: rgba(30,41,59,0.7);
-            color: #f1f5f9;
+            border: 1.5px solid #e2e8f0;
+            background: #ffffff;
+            color: #1e293b;
             font-size: 0.875rem;
             font-family: inherit;
             transition: border-color 0.15s, box-shadow 0.15s;
         }
 
-        .input-wrap input::placeholder { color: #334155; }
+        .input-wrap input::placeholder { color: #94a3b8; }
 
         .input-wrap input:focus {
             outline: none;
-            border-color: #6366f1;
-            box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
+            border-color: #1a3a6b;
+            box-shadow: 0 0 0 3px rgba(26,58,107,0.1);
         }
 
         .toggle-pw {
@@ -150,13 +150,13 @@ function e($v): string {
             right: 0.9rem;
             background: none;
             border: none;
-            color: #475569;
+            color: #94a3b8;
             cursor: pointer;
             padding: 0;
             line-height: 0;
         }
 
-        .toggle-pw:hover { color: #94a3b8; }
+        .toggle-pw:hover { color: #64748b; }
 
         .alert {
             display: flex;
@@ -170,15 +170,15 @@ function e($v): string {
         }
 
         .alert svg { width: 18px; height: 18px; flex-shrink: 0; margin-top: 1px; }
-        .alert-error { background: rgba(248,113,113,0.1); color: #fca5a5; border: 1px solid rgba(248,113,113,0.2); }
-        .alert-verifying { background: rgba(99,102,241,0.1); color: #a5b4fc; border: 1px solid rgba(99,102,241,0.2); }
+        .alert-error { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+        .alert-verifying { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; }
 
         .btn-submit {
             width: 100%;
             padding: 0.9rem;
             border: none;
             border-radius: 12px;
-            background: linear-gradient(135deg, #4f46e5, #7c3aed);
+            background: #1a3a6b;
             color: #fff;
             font-size: 0.9rem;
             font-weight: 600;
@@ -188,7 +188,7 @@ function e($v): string {
             margin-top: 0.25rem;
         }
 
-        .btn-submit:hover { opacity: 0.9; transform: translateY(-1px); }
+        .btn-submit:hover { opacity: 0.9; transform: translateY(-1px); background: #14305a; }
 
         .checkbox-group {
             display: flex;
@@ -203,47 +203,47 @@ function e($v): string {
             gap: 8px;
             cursor: pointer;
             font-size: 0.8rem;
-            color: #94a3b8;
+            color: #475569;
         }
 
         .checkbox-label input {
             width: 16px;
             height: 16px;
             cursor: pointer;
-            accent-color: #6366f1;
+            accent-color: #1a3a6b;
         }
 
         .forgot-link {
-            color: #818cf8;
+            color: #1a3a6b;
             font-size: 0.8rem;
             text-decoration: none;
             font-weight: 500;
         }
 
-        .forgot-link:hover { color: #a5b4fc; text-decoration: underline; }
+        .forgot-link:hover { color: #0f2a4f; text-decoration: underline; }
 
         .links {
             margin-top: 1.25rem;
             text-align: center;
             font-size: 0.8rem;
-            color: #475569;
+            color: #64748b;
             display: flex;
             justify-content: space-between;
             gap: 0.5rem;
         }
 
-        .links a { color: #818cf8; text-decoration: none; font-weight: 500; }
-        .links a:hover { color: #a5b4fc; }
+        .links a { color: #1a3a6b; text-decoration: none; font-weight: 500; }
+        .links a:hover { color: #0f2a4f; text-decoration: underline; }
 
         .card-footer {
             margin-top: 1rem;
             text-align: center;
             font-size: 0.8rem;
-            color: #475569;
+            color: #64748b;
         }
 
-        .card-footer a { color: #818cf8; text-decoration: none; font-weight: 500; }
-        .card-footer a:hover { color: #a5b4fc; }
+        .card-footer a { color: #1a3a6b; text-decoration: none; font-weight: 500; }
+        .card-footer a:hover { color: #0f2a4f; text-decoration: underline; }
 
         .verifying-text {
             font-size: 0.75rem;
@@ -335,7 +335,7 @@ function e($v): string {
     </div>
 
     <div class="card-footer">
-        <a href="Home.php">← Back to Home</a>
+        <a href="index.php">← Back to Home</a>
     </div>
 </div>
 

@@ -2,766 +2,343 @@
 session_start();
 require_once __DIR__ . '/db.php';
 
-// Check if user is logged in and is teacher/staff
-if (!isset($_SESSION['user_id']) || ($_SESSION['role'] !== 'staff' && $_SESSION['role'] !== 'teacher')) {
+if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'staff') {
     header('Location: StaffLogin.php');
     exit;
 }
 
-$teacher_id = $_SESSION['user_id'];
-$success_message = '';
-$error_message = '';
-
-$mysqli = db_connect();
-
-// Handle grade submission/update
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['save_grades'])) {
-        $student_id = intval($_POST['student_id']);
-        $course_id = intval($_POST['course_id']);
-        $grade = strtoupper(trim($_POST['grade']));
-        $score = floatval($_POST['score']);
-        $semester = $_POST['semester'];
-        $academic_year = $_POST['academic_year'];
-        $assessment_type = $_POST['assessment_type'];
-        $comments = trim($_POST['comments']);
-        
-        // Validate grade
-        $valid_grades = ['A', 'B', 'C', 'D', 'F', 'I', 'W'];
-        if (!in_array($grade, $valid_grades)) {
-            $error_message = "Invalid grade. Please enter A, B, C, D, F, I, or W.";
-        } elseif ($score < 0 || $score > 100) {
-            $error_message = "Score must be between 0 and 100.";
-        } else {
-            // Check if grade already exists
-            $check_stmt = $mysqli->prepare("
-                SELECT id FROM grades 
-                WHERE student_id = ? AND course_id = ? AND semester = ? AND academic_year = ?
-            ");
-            $check_stmt->bind_param("iiss", $student_id, $course_id, $semester, $academic_year);
-            $check_stmt->execute();
-            $exists = $check_stmt->get_result()->num_rows > 0;
-            $check_stmt->close();
-            
-            if ($exists) {
-                // Update existing grade
-                $stmt = $mysqli->prepare("
-                    UPDATE grades 
-                    SET grade = ?, score = ?, assessment_type = ?, comments = ?, last_modified = NOW()
-                    WHERE student_id = ? AND course_id = ? AND semester = ? AND academic_year = ?
-                ");
-                $stmt->bind_param("sdssiiss", $grade, $score, $assessment_type, $comments, $student_id, $course_id, $semester, $academic_year);
-            } else {
-                // Insert new grade
-                $stmt = $mysqli->prepare("
-                    INSERT INTO grades (student_id, course_id, teacher_id, grade, score, semester, academic_year, assessment_type, comments, entered_by)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ");
-                $stmt->bind_param("iiisdssssi", $student_id, $course_id, $teacher_id, $grade, $score, $semester, $academic_year, $assessment_type, $comments, $teacher_id);
-            }
-            
-            if ($stmt->execute()) {
-                $success_message = "Grade saved successfully!";
-            } else {
-                $error_message = "Failed to save grade: " . $stmt->error;
-            }
-            $stmt->close();
-        }
-    }
-    
-    // Handle bulk grade upload
-    if (isset($_POST['bulk_save'])) {
-        $course_id = intval($_POST['course_id']);
-        $semester = $_POST['semester'];
-        $academic_year = $_POST['academic_year'];
-        $assessment_type = $_POST['assessment_type'];
-        
-        $saved_count = 0;
-        $error_count = 0;
-        
-        foreach ($_POST['grades'] as $student_id => $data) {
-            $grade = strtoupper(trim($data['grade']));
-            $score = floatval($data['score']);
-            $comments = trim($data['comments']);
-            
-            $valid_grades = ['A', 'B', 'C', 'D', 'F', 'I', 'W'];
-            if (in_array($grade, $valid_grades) && $score >= 0 && $score <= 100) {
-                // Check if exists
-                $check_stmt = $mysqli->prepare("
-                    SELECT id FROM grades 
-                    WHERE student_id = ? AND course_id = ? AND semester = ? AND academic_year = ?
-                ");
-                $check_stmt->bind_param("iiss", $student_id, $course_id, $semester, $academic_year);
-                $check_stmt->execute();
-                $exists = $check_stmt->get_result()->num_rows > 0;
-                $check_stmt->close();
-                
-                if ($exists) {
-                    $stmt = $mysqli->prepare("
-                        UPDATE grades 
-                        SET grade = ?, score = ?, assessment_type = ?, comments = ?, last_modified = NOW()
-                        WHERE student_id = ? AND course_id = ? AND semester = ? AND academic_year = ?
-                    ");
-                    $stmt->bind_param("sdssiiss", $grade, $score, $assessment_type, $comments, $student_id, $course_id, $semester, $academic_year);
-                } else {
-                    $stmt = $mysqli->prepare("
-                        INSERT INTO grades (student_id, course_id, teacher_id, grade, score, semester, academic_year, assessment_type, comments, entered_by)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ");
-                    $stmt->bind_param("iiisdssssi", $student_id, $course_id, $teacher_id, $grade, $score, $semester, $academic_year, $assessment_type, $comments, $teacher_id);
-                }
-                
-                if ($stmt->execute()) {
-                    $saved_count++;
-                } else {
-                    $error_count++;
-                }
-                $stmt->close();
-            } else {
-                $error_count++;
-            }
-        }
-        
-        $success_message = "Bulk save completed! Saved: $saved_count, Errors: $error_count";
+if (!function_exists('e')) {
+    function e($value): string {
+        return htmlspecialchars((string) ($value ?? ''), ENT_QUOTES, 'UTF-8');
     }
 }
 
-// Get teacher's courses
-$courses_query = "
-    SELECT DISTINCT c.* 
-    FROM courses c
-    LEFT JOIN teacher_course_assignments tca ON c.id = tca.course_id
-    WHERE tca.teacher_id = ? OR c.teacher_id = ?
-    ORDER BY c.course_code
-";
-$stmt = $mysqli->prepare($courses_query);
-$stmt->bind_param("ii", $teacher_id, $teacher_id);
-$stmt->execute();
-$courses = $stmt->get_result();
+function table_exists(mysqli $mysqli, string $table): bool
+{
+    $result = $mysqli->query("SHOW TABLES LIKE '" . $mysqli->real_escape_string($table) . "'");
+    return $result && $result->num_rows > 0;
+}
 
-// Get selected course's students
-$selected_course_id = isset($_GET['course_id']) ? intval($_GET['course_id']) : 0;
-$selected_semester = isset($_GET['semester']) ? $_GET['semester'] : 'Semester 1';
-$selected_academic_year = isset($_GET['academic_year']) ? $_GET['academic_year'] : date('Y');
-$students_list = [];
+function ensure_grade_columns(mysqli $mysqli, string $table): void
+{
+    if (!table_exists($mysqli, $table)) {
+        return;
+    }
+
+    $columns = [
+        'grade' => "ALTER TABLE `{$table}` ADD COLUMN grade VARCHAR(10) DEFAULT NULL",
+        'grade_points' => "ALTER TABLE `{$table}` ADD COLUMN grade_points DECIMAL(4,2) DEFAULT NULL",
+        'graded_by' => "ALTER TABLE `{$table}` ADD COLUMN graded_by INT DEFAULT NULL",
+        'graded_at' => "ALTER TABLE `{$table}` ADD COLUMN graded_at TIMESTAMP NULL DEFAULT NULL",
+        'remarks' => "ALTER TABLE `{$table}` ADD COLUMN remarks TEXT DEFAULT NULL",
+    ];
+
+    foreach ($columns as $column => $sql) {
+        $check = $mysqli->query("SHOW COLUMNS FROM `{$table}` LIKE '" . $mysqli->real_escape_string($column) . "'");
+        if (!$check || $check->num_rows === 0) {
+            $mysqli->query($sql);
+        }
+    }
+}
+
+function grade_points_for(string $grade): float
+{
+    return match ($grade) {
+        'A' => 4.00,
+        'B+' => 3.50,
+        'B' => 3.00,
+        'C+' => 2.50,
+        'C' => 2.00,
+        'D' => 1.00,
+        'F' => 0.00,
+        default => 0.00,
+    };
+}
+
+$teacher_id = (int) $_SESSION['user_id'];
+$teacher_name = $_SESSION['full_name'] ?? $_SESSION['username'] ?? 'Teacher';
+$initials = strtoupper(substr($teacher_name, 0, 1));
+$message = '';
+$messageType = '';
+$current_page = basename($_SERVER['PHP_SELF']);
+
+$mysqli = db_connect();
+ensure_grade_columns($mysqli, 'student_course_registration');
+ensure_grade_columns($mysqli, 'course_registrations');
+
+if (isset($_SESSION['flash'])) {
+    $message = $_SESSION['flash']['message'] ?? '';
+    $messageType = $_SESSION['flash']['type'] ?? '';
+    unset($_SESSION['flash']);
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_grade'])) {
+    $course_id = (int) ($_POST['course_id'] ?? 0);
+    $student_id = (int) ($_POST['student_id'] ?? 0);
+    $grade = strtoupper(trim($_POST['grade'] ?? ''));
+    $remarks = trim($_POST['remarks'] ?? '');
+    $enrollment_table = $_POST['enrollment_table'] ?? 'student_course_registration';
+    $grade_points = grade_points_for($grade);
+
+    if (!in_array($enrollment_table, ['student_course_registration', 'course_registrations', 'student_courses'], true) || !table_exists($mysqli, $enrollment_table)) {
+        $enrollment_table = 'student_course_registration';
+    }
+
+    if ($enrollment_table === 'student_courses') {
+        $stmt = $mysqli->prepare("UPDATE student_courses SET grade = ?, remarks = ? WHERE course_id = ? AND student_id = ?");
+        if ($stmt) {
+            $stmt->bind_param('ssii', $grade, $remarks, $course_id, $student_id);
+        }
+    } else {
+        $stmt = $mysqli->prepare("UPDATE `{$enrollment_table}` SET grade = ?, grade_points = ?, remarks = ?, graded_by = ?, graded_at = NOW() WHERE course_id = ? AND student_id = ? AND status = 'enrolled'");
+        if ($stmt) {
+            $stmt->bind_param('sdsiii', $grade, $grade_points, $remarks, $teacher_id, $course_id, $student_id);
+        }
+    }
+
+    if (isset($stmt) && $stmt) {
+        if ($stmt->execute() && $stmt->affected_rows >= 0) {
+            $_SESSION['flash'] = ['type' => 'success', 'message' => 'Grade saved successfully.'];
+        } else {
+            $_SESSION['flash'] = ['type' => 'error', 'message' => 'Failed to save grade: ' . $stmt->error];
+        }
+        $stmt->close();
+    } else {
+        $_SESSION['flash'] = ['type' => 'error', 'message' => 'Unable to prepare grade update.'];
+    }
+
+    header('Location: manage_grades.php?course_id=' . $course_id);
+    exit;
+}
+
+$selected_course_id = isset($_GET['course_id']) ? (int) $_GET['course_id'] : 0;
+$course_info = null;
+$students = [];
+$enrollment_table = '';
+
+$availableTables = [];
+foreach (['student_course_registration', 'course_registrations', 'student_courses'] as $candidate) {
+    if (table_exists($mysqli, $candidate)) {
+        $availableTables[] = $candidate;
+    }
+}
+
+$courses = [];
+if (!empty($availableTables)) {
+    $unionParts = [];
+    foreach ($availableTables as $table) {
+        if ($table === 'student_courses') {
+            $unionParts[] = "SELECT course_id FROM student_courses";
+        } else {
+            $unionParts[] = "SELECT course_id FROM `{$table}` WHERE status = 'enrolled'";
+        }
+    }
+
+    $courseQuery = "
+        SELECT c.id, c.course_code, c.course_name, c.credits, COUNT(*) AS student_count
+        FROM courses c
+        INNER JOIN (
+            " . implode(" UNION ALL ", $unionParts) . "
+        ) reg ON reg.course_id = c.id
+        GROUP BY c.id, c.course_code, c.course_name, c.credits
+        ORDER BY c.course_code
+    ";
+
+    $courseStmt = $mysqli->prepare($courseQuery);
+    if ($courseStmt) {
+        $courseStmt->execute();
+        $courses = $courseStmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $courseStmt->close();
+    }
+}
 
 if ($selected_course_id > 0) {
-    $students_query = "
-        SELECT DISTINCT u.id, u.username, u.first_name, u.surname, u.email,
-               g.grade, g.score, g.comments, g.assessment_type, g.id as grade_id
-        FROM users u
-        JOIN student_courses sc ON u.id = sc.student_id
-        LEFT JOIN grades g ON u.id = g.student_id 
-            AND g.course_id = ? 
-            AND g.semester = ? 
-            AND g.academic_year = ?
-        WHERE sc.course_id = ? 
-        AND sc.status = 'registered'
-        AND u.role = 'student'
-        ORDER BY u.surname, u.first_name
-    ";
-    $stmt = $mysqli->prepare($students_query);
-    $stmt->bind_param("issi", $selected_course_id, $selected_semester, $selected_academic_year, $selected_course_id);
-    $stmt->execute();
-    $students_list = $stmt->get_result();
+    $courseStmt = $mysqli->prepare('SELECT id, course_code, course_name, credits FROM courses WHERE id = ?');
+    $courseStmt->bind_param('i', $selected_course_id);
+    $courseStmt->execute();
+    $course_info = $courseStmt->get_result()->fetch_assoc();
+    $courseStmt->close();
+
+    foreach ($availableTables as $candidate) {
+        if ($candidate === 'student_courses') {
+            $countStmt = $mysqli->prepare('SELECT COUNT(*) FROM student_courses WHERE course_id = ?');
+        } else {
+            $countStmt = $mysqli->prepare("SELECT COUNT(*) FROM `{$candidate}` WHERE course_id = ? AND status = 'enrolled'");
+        }
+
+        if (!$countStmt) {
+            continue;
+        }
+
+        $countStmt->bind_param('i', $selected_course_id);
+        $countStmt->execute();
+        $countStmt->bind_result($rowCount);
+        $countStmt->fetch();
+        $countStmt->close();
+
+        if ($rowCount > 0) {
+            $enrollment_table = $candidate;
+            break;
+        }
+    }
+
+    if ($enrollment_table === '') {
+        $enrollment_table = 'student_course_registration';
+    }
+
+    if ($enrollment_table === 'student_courses') {
+        $studentsQuery = "
+            SELECT u.id, u.username, u.first_name, u.surname, u.email,
+                   COALESCE(sc.grade, '') AS grade,
+                   COALESCE(sc.remarks, '') AS remarks
+            FROM users u
+            INNER JOIN student_courses sc ON u.id = sc.student_id
+            WHERE sc.course_id = ? AND u.role = 'student'
+            ORDER BY u.surname, u.first_name
+        ";
+    } else {
+        $studentsQuery = "
+            SELECT u.id, u.username, u.first_name, u.surname, u.email,
+                   COALESCE(r.grade, '') AS grade,
+                   COALESCE(r.remarks, '') AS remarks,
+                   COALESCE(r.grade_points, 0) AS grade_points
+            FROM users u
+            INNER JOIN `{$enrollment_table}` r ON u.id = r.student_id
+            WHERE r.course_id = ? AND r.status = 'enrolled' AND u.role = 'student'
+            ORDER BY u.surname, u.first_name
+        ";
+    }
+
+    $studentsStmt = $mysqli->prepare($studentsQuery);
+    if ($studentsStmt) {
+        $studentsStmt->bind_param('i', $selected_course_id);
+        $studentsStmt->execute();
+        $students = $studentsStmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $studentsStmt->close();
+    }
 }
 
 $mysqli->close();
-
-function e($value) {
-    return htmlspecialchars($value ?? '', ENT_QUOTES, 'UTF-8');
-}
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manage Grades | Teacher Portal</title>
+    <title>Manage Grades | Staff Portal</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #f0f2f5;
-            color: #333;
-        }
-
-        /* Navigation */
-        .navbar {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 1rem 2rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-
-        .nav-links a {
-            color: white;
-            text-decoration: none;
-            margin-left: 1.5rem;
-            padding: 0.5rem;
-            border-radius: 6px;
-            transition: background 0.3s;
-        }
-
-        .nav-links a:hover {
-            background: rgba(255,255,255,0.1);
-        }
-
-        .container {
-            max-width: 1400px;
-            margin: 2rem auto;
-            padding: 0 2rem;
-        }
-
-        /* Cards */
-        .card {
-            background: white;
-            border-radius: 12px;
-            padding: 1.5rem;
-            margin-bottom: 1.5rem;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-        }
-
-        .card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1.5rem;
-            padding-bottom: 1rem;
-            border-bottom: 2px solid #e2e8f0;
-        }
-
-        .card-header h2 {
-            color: #1e293b;
-            font-size: 1.3rem;
-        }
-
-        /* Forms */
-        .form-group {
-            margin-bottom: 1rem;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 0.5rem;
-            font-weight: 500;
-            color: #475569;
-        }
-
-        .form-group select,
-        .form-group input,
-        .form-group textarea {
-            width: 100%;
-            padding: 0.7rem;
-            border: 1px solid #cbd5e1;
-            border-radius: 8px;
-            font-size: 0.9rem;
-        }
-
-        .form-row {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1rem;
-        }
-
-        /* Buttons */
-        .btn {
-            padding: 0.6rem 1.2rem;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 0.9rem;
-            transition: all 0.3s;
-            text-decoration: none;
-            display: inline-block;
-        }
-
-        .btn-primary {
-            background: #667eea;
-            color: white;
-        }
-
-        .btn-primary:hover {
-            background: #5a67d8;
-            transform: translateY(-1px);
-        }
-
-        .btn-success {
-            background: #48bb78;
-            color: white;
-        }
-
-        .btn-success:hover {
-            background: #38a169;
-        }
-
-        .btn-warning {
-            background: #ed8936;
-            color: white;
-        }
-
-        .btn-info {
-            background: #4299e1;
-            color: white;
-        }
-
-        /* Table */
-        .grades-table {
-            overflow-x: auto;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        th {
-            background: #f8fafc;
-            padding: 0.8rem;
-            text-align: left;
-            font-weight: 600;
-            color: #475569;
-            border-bottom: 2px solid #e2e8f0;
-        }
-
-        td {
-            padding: 0.8rem;
-            border-bottom: 1px solid #e2e8f0;
-        }
-
-        tr:hover {
-            background: #f8fafc;
-        }
-
-        .grade-input {
-            width: 70px;
-            text-align: center;
-        }
-
-        .score-input {
-            width: 80px;
-            text-align: center;
-        }
-
-        /* Alerts */
-        .alert {
-            padding: 1rem;
-            border-radius: 8px;
-            margin-bottom: 1rem;
-        }
-
-        .alert-success {
-            background: #d4edda;
-            color: #155724;
-            border-left: 4px solid #28a745;
-        }
-
-        .alert-error {
-            background: #f8d7da;
-            color: #721c24;
-            border-left: 4px solid #dc3545;
-        }
-
-        /* Stats */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .stat-box {
-            background: white;
-            padding: 1rem;
-            border-radius: 8px;
-            text-align: center;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-
-        .stat-value {
-            font-size: 1.8rem;
-            font-weight: bold;
-            color: #667eea;
-        }
-
-        .stat-label {
-            color: #64748b;
-            font-size: 0.85rem;
-            margin-top: 0.3rem;
-        }
-
-        @media (max-width: 768px) {
-            .container {
-                padding: 0 1rem;
-            }
-            
-            .form-row {
-                grid-template-columns: 1fr;
-            }
-            
-            table {
-                font-size: 0.85rem;
-            }
-        }
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: Segoe UI, Tahoma, sans-serif; background: #f3f6fb; color: #1f2937; }
+        .main { min-height: 100vh; padding: 24px; }
+        .top { background: #fff; padding: 18px 20px; border-radius: 14px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .avatar { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: #6366f1; color: #fff; font-weight: 700; }
+        .card { background: #fff; border-radius: 14px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(15,23,42,.06); }
+        .message { padding: 14px 16px; border-radius: 10px; margin-bottom: 16px; }
+        .success { background: #dcfce7; color: #166534; }
+        .error { background: #fee2e2; color: #991b1b; }
+        .warning { background: #fef3c7; color: #92400e; }
+        label { display: block; margin-bottom: 8px; font-weight: 600; }
+        select, input { width: 100%; padding: 10px 12px; border: 1px solid #dbe3ef; border-radius: 10px; }
+        .course-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+        .student-card { border: 1px solid #e5e7eb; border-radius: 14px; padding: 16px; background: #fff; }
+        .student-name { font-weight: 700; margin-bottom: 4px; }
+        .student-email { color: #64748b; font-size: 14px; margin-bottom: 12px; }
+        .badge { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+        .badge-graded { background: #dcfce7; color: #166534; }
+        .badge-pending { background: #fef3c7; color: #92400e; }
+        .row { margin-bottom: 12px; }
+        .actions { display: flex; gap: 10px; align-items: center; justify-content: space-between; }
+        .btn { display: inline-block; padding: 10px 16px; border: 0; border-radius: 10px; cursor: pointer; text-decoration: none; font-weight: 600; }
+        .btn-primary { background: #6366f1; color: #fff; }
+        .btn-success { background: #10b981; color: #fff; }
     </style>
 </head>
 <body>
-    <nav class="navbar">
-        <h2>📚 Grade Management System</h2>
-        <div class="nav-links">
-            <span>👋 Welcome, <?php echo e($_SESSION['username']); ?></span>
-            <a href="StaffDashboard.php">Dashboard</a>
-            <a href="logout.php">Logout</a>
-        </div>
-    </nav>
-
-    <div class="container">
-        <?php if ($success_message): ?>
-            <div class="alert alert-success"><?php echo e($success_message); ?></div>
-        <?php endif; ?>
-        
-        <?php if ($error_message): ?>
-            <div class="alert alert-error"><?php echo e($error_message); ?></div>
-        <?php endif; ?>
-
-        <!-- Course Selection -->
-        <div class="card">
-            <div class="card-header">
-                <h2>📖 Select Course to Manage Grades</h2>
+    <main class="main">
+        <div class="top">
+            <div>
+                <h1 style="margin:0;">Manage Grades</h1>
+                <div style="color:#64748b;">Select a course, then enter grades for the students enrolled in it.</div>
             </div>
-            <form method="GET" action="">
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="course_id">Course</label>
-                        <select name="course_id" id="course_id" required onchange="this.form.submit()">
-                            <option value="">-- Select Course --</option>
-                            <?php while ($course = $courses->fetch_assoc()): ?>
-                            <option value="<?php echo $course['id']; ?>" <?php echo $selected_course_id == $course['id'] ? 'selected' : ''; ?>>
-                                <?php echo e($course['course_code']); ?> - <?php echo e($course['course_name']); ?>
-                            </option>
-                            <?php endwhile; ?>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="semester">Semester</label>
-                        <select name="semester" id="semester" onchange="this.form.submit()">
-                            <option value="Semester 1" <?php echo $selected_semester == 'Semester 1' ? 'selected' : ''; ?>>Semester 1</option>
-                            <option value="Semester 2" <?php echo $selected_semester == 'Semester 2' ? 'selected' : ''; ?>>Semester 2</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="academic_year">Academic Year</label>
-                        <select name="academic_year" id="academic_year" onchange="this.form.submit()">
-                            <option value="<?php echo date('Y'); ?>" <?php echo $selected_academic_year == date('Y') ? 'selected' : ''; ?>><?php echo date('Y'); ?></option>
-                            <option value="<?php echo date('Y') - 1; ?>" <?php echo $selected_academic_year == date('Y') - 1 ? 'selected' : ''; ?>><?php echo date('Y') - 1; ?></option>
-                            <option value="<?php echo date('Y') + 1; ?>" <?php echo $selected_academic_year == date('Y') + 1 ? 'selected' : ''; ?>><?php echo date('Y') + 1; ?></option>
-                        </select>
-                    </div>
-                </div>
+            <div class="avatar"><?php echo e($initials); ?></div>
+        </div>
+
+        <?php if ($message): ?>
+            <div class="message <?php echo e($messageType); ?>"><?php echo e($message); ?></div>
+        <?php endif; ?>
+
+        <div class="card">
+            <form method="GET" action="manage_grades.php">
+                <label for="course_id">Choose Course to Grade</label>
+                <select name="course_id" id="course_id" onchange="this.form.submit()">
+                    <option value="">-- Select a course --</option>
+                    <?php foreach ($courses as $course): ?>
+                        <option value="<?php echo (int) $course['id']; ?>" <?php echo $selected_course_id === (int) $course['id'] ? 'selected' : ''; ?>>
+                            <?php echo e($course['course_code']); ?> - <?php echo e($course['course_name']); ?> (<?php echo (int) $course['student_count']; ?> students)
+                        </option>
+                    <?php endforeach; ?>
+                </select>
             </form>
         </div>
 
-        <?php if ($selected_course_id > 0 && $students_list && $students_list->num_rows > 0): 
-            // Calculate statistics
-            $total_students = 0;
-            $grades_distribution = ['A' => 0, 'B' => 0, 'C' => 0, 'D' => 0, 'F' => 0];
-            $total_score = 0;
-            $scores_count = 0;
-            
-            $students_array = [];
-            while ($student = $students_list->fetch_assoc()) {
-                $students_array[] = $student;
-                $total_students++;
-                if ($student['grade']) {
-                    $grades_distribution[$student['grade']]++;
-                }
-                if ($student['score']) {
-                    $total_score += $student['score'];
-                    $scores_count++;
-                }
-            }
-            $average_score = $scores_count > 0 ? round($total_score / $scores_count, 2) : 0;
-        ?>
-        
-        <!-- Statistics -->
-        <div class="stats-grid">
-            <div class="stat-box">
-                <div class="stat-value"><?php echo $total_students; ?></div>
-                <div class="stat-label">Total Students</div>
-            </div>
-            <div class="stat-box">
-                <div class="stat-value"><?php echo $average_score; ?>%</div>
-                <div class="stat-label">Average Score</div>
-            </div>
-            <div class="stat-box">
-                <div class="stat-value">
-                    <?php 
-                    $pass_count = ($grades_distribution['A'] + $grades_distribution['B'] + $grades_distribution['C']);
-                    $pass_rate = $total_students > 0 ? round(($pass_count / $total_students) * 100, 1) : 0;
-                    echo $pass_rate . '%';
-                    ?>
-                </div>
-                <div class="stat-label">Pass Rate</div>
-            </div>
-        </div>
+        <?php if ($selected_course_id > 0 && $course_info): ?>
+            <div class="card">
+                <h2 style="margin-top:0;">Enter Grades for <?php echo e($course_info['course_code']); ?> - <?php echo e($course_info['course_name']); ?></h2>
+                <p style="color:#64748b; margin-top:-6px; margin-bottom:16px;">
+                    <?php echo count($students); ?> students enrolled
+                </p>
 
-        <!-- Single Grade Entry Form -->
-        <div class="card">
-            <div class="card-header">
-                <h2>✏️ Quick Grade Entry</h2>
-                <button onclick="toggleBulkMode()" class="btn btn-info">Switch to Bulk Mode</button>
-            </div>
-            <div id="single-mode">
-                <form method="POST" action="">
-                    <input type="hidden" name="course_id" value="<?php echo $selected_course_id; ?>">
-                    <input type="hidden" name="semester" value="<?php echo $selected_semester; ?>">
-                    <input type="hidden" name="academic_year" value="<?php echo $selected_academic_year; ?>">
-                    
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="student_id">Select Student</label>
-                            <select name="student_id" id="student_id" required>
-                                <option value="">-- Select Student --</option>
-                                <?php foreach ($students_array as $student): ?>
-                                <option value="<?php echo $student['id']; ?>">
-                                    <?php echo e($student['surname'] . ' ' . $student['first_name']); ?> (<?php echo e($student['username']); ?>)
-                                </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="grade">Grade (A-F)</label>
-                            <select name="grade" id="grade" required>
-                                <option value="">-- Select Grade --</option>
-                                <option value="A">A (Excellent) 80-100%</option>
-                                <option value="B">B (Good) 70-79%</option>
-                                <option value="C">C (Satisfactory) 60-69%</option>
-                                <option value="D">D (Pass) 50-59%</option>
-                                <option value="F">F (Fail) Below 50%</option>
-                                <option value="I">I (Incomplete)</option>
-                                <option value="W">W (Withdrawn)</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="score">Score (0-100)</label>
-                            <input type="number" name="score" id="score" step="0.01" min="0" max="100" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="assessment_type">Assessment Type</label>
-                            <select name="assessment_type" id="assessment_type">
-                                <option value="continuous_assessment">Continuous Assessment</option>
-                                <option value="mid_exam">Mid-Semester Exam</option>
-                                <option value="final_exam">Final Exam</option>
-                                <option value="total">Total Score</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label for="comments">Comments (Optional)</label>
-                        <textarea name="comments" id="comments" rows="2" placeholder="Additional comments about student performance..."></textarea>
-                    </div>
-                    <button type="submit" name="save_grades" class="btn btn-primary">Save Grade</button>
-                </form>
-            </div>
-            
-            <!-- Bulk Grade Entry Mode -->
-            <div id="bulk-mode" style="display: none;">
-                <form method="POST" action="">
-                    <input type="hidden" name="course_id" value="<?php echo $selected_course_id; ?>">
-                    <input type="hidden" name="semester" value="<?php echo $selected_semester; ?>">
-                    <input type="hidden" name="academic_year" value="<?php echo $selected_academic_year; ?>">
-                    <input type="hidden" name="assessment_type" value="total">
-                    
-                    <div class="grades-table">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Student Name</th>
-                                    <th>Username</th>
-                                    <th>Grade</th>
-                                    <th>Score (%)</th>
-                                    <th>Comments</th>
-                                    <th>Current Grade</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($students_array as $student): ?>
-                                <tr>
-                                    <td><?php echo e($student['surname'] . ' ' . $student['first_name']); ?></td>
-                                    <td><?php echo e($student['username']); ?></td>
-                                    <td>
-                                        <select name="grades[<?php echo $student['id']; ?>][grade]" class="grade-input">
-                                            <option value="">--</option>
-                                            <option value="A" <?php echo $student['grade'] == 'A' ? 'selected' : ''; ?>>A</option>
-                                            <option value="B" <?php echo $student['grade'] == 'B' ? 'selected' : ''; ?>>B</option>
-                                            <option value="C" <?php echo $student['grade'] == 'C' ? 'selected' : ''; ?>>C</option>
-                                            <option value="D" <?php echo $student['grade'] == 'D' ? 'selected' : ''; ?>>D</option>
-                                            <option value="F" <?php echo $student['grade'] == 'F' ? 'selected' : ''; ?>>F</option>
-                                            <option value="I" <?php echo $student['grade'] == 'I' ? 'selected' : ''; ?>>I</option>
-                                            <option value="W" <?php echo $student['grade'] == 'W' ? 'selected' : ''; ?>>W</option>
+                <?php if (!empty($students)): ?>
+                    <div class="course-grid">
+                        <?php foreach ($students as $student): ?>
+                            <div class="student-card">
+                                <div class="student-name"><?php echo e($student['first_name'] . ' ' . $student['surname']); ?></div>
+                                <div class="student-email"><?php echo e($student['email']); ?></div>
+                                <div class="row">
+                                    <?php if (!empty($student['grade'])): ?>
+                                        <span class="badge badge-graded"><?php echo e($student['grade']); ?></span>
+                                    <?php else: ?>
+                                        <span class="badge badge-pending">Not graded</span>
+                                    <?php endif; ?>
+                                </div>
+                                <form method="POST" action="manage_grades.php?course_id=<?php echo (int) $selected_course_id; ?>">
+                                    <input type="hidden" name="save_grade" value="1">
+                                    <input type="hidden" name="course_id" value="<?php echo (int) $selected_course_id; ?>">
+                                    <input type="hidden" name="student_id" value="<?php echo (int) $student['id']; ?>">
+                                    <input type="hidden" name="enrollment_table" value="<?php echo e($enrollment_table); ?>">
+                                    <div class="row">
+                                        <label>New Grade</label>
+                                        <select name="grade" required>
+                                            <option value="">Select Grade</option>
+                                            <option value="A" <?php echo ($student['grade'] ?? '') === 'A' ? 'selected' : ''; ?>>A</option>
+                                            <option value="B+" <?php echo ($student['grade'] ?? '') === 'B+' ? 'selected' : ''; ?>>B+</option>
+                                            <option value="B" <?php echo ($student['grade'] ?? '') === 'B' ? 'selected' : ''; ?>>B</option>
+                                            <option value="C+" <?php echo ($student['grade'] ?? '') === 'C+' ? 'selected' : ''; ?>>C+</option>
+                                            <option value="C" <?php echo ($student['grade'] ?? '') === 'C' ? 'selected' : ''; ?>>C</option>
+                                            <option value="D" <?php echo ($student['grade'] ?? '') === 'D' ? 'selected' : ''; ?>>D</option>
+                                            <option value="F" <?php echo ($student['grade'] ?? '') === 'F' ? 'selected' : ''; ?>>F</option>
                                         </select>
-                                    </td>
-                                    <td>
-                                        <input type="number" name="grades[<?php echo $student['id']; ?>][score]" 
-                                               value="<?php echo $student['score']; ?>" 
-                                               class="score-input" step="0.01" min="0" max="100">
-                                    </td>
-                                    <td>
-                                        <input type="text" name="grades[<?php echo $student['id']; ?>][comments]" 
-                                               value="<?php echo e($student['comments']); ?>" 
-                                               style="width: 100%; padding: 0.3rem;">
-                                    </td>
-                                    <td>
-                                        <?php if ($student['grade']): ?>
-                                            <span style="font-weight: bold; color: <?php echo $student['grade'] == 'F' ? 'red' : 'green'; ?>">
-                                                <?php echo $student['grade'] . ' (' . $student['score'] . '%)'; ?>
-                                            </span>
-                                        <?php else: ?>
-                                            <span style="color: #999;">Not graded</span>
-                                        <?php endif; ?>
-                                    </td>
-                                </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                    <div style="margin-top: 1rem;">
-                        <button type="submit" name="bulk_save" class="btn btn-success">Save All Grades</button>
-                        <button type="button" onclick="toggleBulkMode()" class="btn btn-warning">Switch to Single Mode</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-
-        <!-- Grade Table View -->
-        <div class="card">
-            <div class="card-header">
-                <h2>📊 Current Grades</h2>
-                <button onclick="exportToCSV()" class="btn btn-success">Export to CSV</button>
-            </div>
-            <div class="grades-table">
-                <table id="grades-table">
-                    <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>Student Name</th>
-                            <th>Username</th>
-                            <th>Grade</th>
-                            <th>Score</th>
-                            <th>Assessment Type</th>
-                            <th>Comments</th>
-                            <th>Last Modified</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php $counter = 1; ?>
-                        <?php foreach ($students_array as $student): ?>
-                        <tr>
-                            <td><?php echo $counter++; ?></td>
-                            <td><?php echo e($student['surname'] . ' ' . $student['first_name']); ?></td>
-                            <td><?php echo e($student['username']); ?></td>
-                            <td>
-                                <?php if ($student['grade']): ?>
-                                    <span style="font-weight: bold; font-size: 1.1rem; color: <?php 
-                                        echo $student['grade'] == 'A' ? '#48bb78' : 
-                                            ($student['grade'] == 'F' ? '#f56565' : '#667eea'); 
-                                    ?>;">
-                                        <?php echo $student['grade']; ?>
-                                    </span>
-                                <?php else: ?>
-                                    <span style="color: #999;">Not set</span>
-                                <?php endif; ?>
-                            </td>
-                            <td><?php echo $student['score'] ? $student['score'] . '%' : '-'; ?></td>
-                            <td><?php echo str_replace('_', ' ', $student['assessment_type'] ?? '-'); ?></td>
-                            <td><?php echo e($student['comments'] ?: '-'); ?></td>
-                            <td><?php echo $student['grade_id'] ? 'Updated' : 'Not set'; ?></td>
-                            <td>
-                                <button onclick="editGrade(<?php echo $student['id']; ?>, '<?php echo $student['grade']; ?>', <?php echo $student['score']; ?>)" 
-                                        class="btn btn-primary" style="padding: 0.3rem 0.6rem;">Edit</button>
-                            </td>
-                        </tr>
+                                    </div>
+                                    <div class="row">
+                                        <label>Remarks</label>
+                                        <input type="text" name="remarks" value="<?php echo e($student['remarks'] ?? ''); ?>" placeholder="Remarks">
+                                    </div>
+                                    <div class="actions">
+                                        <button class="btn btn-success" type="submit">Save Grade</button>
+                                    </div>
+                                </form>
+                            </div>
                         <?php endforeach; ?>
-                    </tbody>
-                </table>
+                    </div>
+                <?php else: ?>
+                    <div class="message warning">No students enrolled in this course yet.</div>
+                <?php endif; ?>
             </div>
-        </div>
-        
         <?php elseif ($selected_course_id > 0): ?>
-            <div class="alert alert-error">
-                No students found registered for this course. Please make sure students are registered.
+            <div class="card">
+                <div class="message warning">No students found for the selected course.</div>
             </div>
         <?php endif; ?>
-    </div>
-
-    <script>
-        function toggleBulkMode() {
-            var singleMode = document.getElementById('single-mode');
-            var bulkMode = document.getElementById('bulk-mode');
-            
-            if (singleMode.style.display === 'none') {
-                singleMode.style.display = 'block';
-                bulkMode.style.display = 'none';
-            } else {
-                singleMode.style.display = 'none';
-                bulkMode.style.display = 'block';
-            }
-        }
-        
-        function editGrade(studentId, currentGrade, currentScore) {
-            document.getElementById('student_id').value = studentId;
-            document.getElementById('grade').value = currentGrade;
-            document.getElementById('score').value = currentScore;
-            document.getElementById('single-mode').scrollIntoView({ behavior: 'smooth' });
-        }
-        
-        function exportToCSV() {
-            var table = document.getElementById('grades-table');
-            var rows = table.querySelectorAll('tr');
-            var csv = [];
-            
-            for (var i = 0; i < rows.length; i++) {
-                var row = [], cols = rows[i].querySelectorAll('td, th');
-                for (var j = 0; j < cols.length; j++) {
-                    var text = cols[j].innerText.replace(/,/g, '');
-                    row.push('"' + text + '"');
-                }
-                csv.push(row.join(','));
-            }
-            
-            var blob = new Blob([csv.join('\n')], { type: 'text/csv' });
-            var link = document.createElement('a');
-            var url = URL.createObjectURL(blob);
-            link.href = url;
-            link.download = 'grades_<?php echo $selected_course_id; ?>.csv';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-        }
-        
-        // Auto-calculate grade based on score
-        document.getElementById('score')?.addEventListener('change', function() {
-            var score = parseFloat(this.value);
-            var gradeSelect = document.getElementById('grade');
-            
-            if (!isNaN(score)) {
-                if (score >= 80) gradeSelect.value = 'A';
-                else if (score >= 70) gradeSelect.value = 'B';
-                else if (score >= 60) gradeSelect.value = 'C';
-                else if (score >= 50) gradeSelect.value = 'D';
-                else if (score < 50 && score >= 0) gradeSelect.value = 'F';
-            }
-        });
-    </script>
+    </main>
 </body>
 </html>

@@ -1,25 +1,47 @@
 <?php
 session_start();
-require_once __DIR__ . '/db.php';
 
-// Clear remember me cookie
-if (isset($_COOKIE['remember_token'])) {
-    $token = $_COOKIE['remember_token'];
-    $mysqli = db_connect();
-    $stmt = $mysqli->prepare("DELETE FROM user_tokens WHERE token = ?");
-    $stmt->bind_param("s", $token);
-    $stmt->execute();
-    $stmt->close();
-    $mysqli->close();
-    
-    setcookie('remember_token', '', time() - 3600, "/");
+// Clear all session variables
+$_SESSION = array();
+
+// Destroy the session cookie
+if (isset($_COOKIE[session_name()])) {
+    setcookie(session_name(), '', time() - 3600, '/');
 }
 
-// Destroy session
-$_SESSION = array();
+// Clear remember me cookies
+if (isset($_COOKIE['remember_token_student'])) {
+    setcookie('remember_token_student', '', time() - 3600, '/');
+}
+if (isset($_COOKIE['saved_student_identifier'])) {
+    setcookie('saved_student_identifier', '', time() - 3600, '/');
+}
+if (isset($_COOKIE['saved_student_password'])) {
+    setcookie('saved_student_password', '', time() - 3600, '/');
+}
+if (isset($_COOKIE['saved_staff_username'])) {
+    setcookie('saved_staff_username', '', time() - 3600, '/');
+}
+if (isset($_COOKIE['saved_staff_password'])) {
+    setcookie('saved_staff_password', '', time() - 3600, '/');
+}
+if (isset($_COOKIE['remember_token'])) {
+    setcookie('remember_token', '', time() - 3600, '/');
+}
+if (isset($_COOKIE['saved_identifier'])) {
+    setcookie('saved_identifier', '', time() - 3600, '/');
+}
+if (isset($_COOKIE['saved_password'])) {
+    setcookie('saved_password', '', time() - 3600, '/');
+}
+if (isset($_COOKIE['saved_username'])) {
+    setcookie('saved_username', '', time() - 3600, '/');
+}
+
+// Destroy the session
 session_destroy();
 
-// Redirect to login
-header('Location: Login.php');
+// Redirect to home page (index.php)
+header('Location: index.php');
 exit;
 ?>

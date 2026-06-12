@@ -60,16 +60,76 @@ $message = '';
 $message_type = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $selected_subjects = $_POST['subjects'] ?? [];
+    $selected_subjects = array_values(array_unique($_POST['subjects'] ?? []));
     
     if (count($selected_subjects) < 4) {
         $message = "Please select at least 4 subjects.";
         $message_type = "error";
     } else {
-        $_SESSION['subjects_selected'] = true;
-        $_SESSION['selected_subjects'] = $selected_subjects;
-        header('Location: index.php');
-        exit;
+        $studentId = (int) $_SESSION['user_id'];
+
+        $mysqli = db_connect();
+        $mysqli->begin_transaction();
+
+        $tableCheck = $mysqli->query("SHOW TABLES LIKE 'student_course_registration'");
+        if (!$tableCheck || $tableCheck->num_rows === 0) {
+            $mysqli->query("CREATE TABLE IF NOT EXISTS student_course_registration (
+                id INT NOT NULL AUTO_INCREMENT,
+                student_id INT NOT NULL,
+                course_id INT NOT NULL,
+                academic_year YEAR NOT NULL,
+                semester VARCHAR(20) NOT NULL DEFAULT 'Full Year',
+                status VARCHAR(20) NOT NULL DEFAULT 'enrolled',
+                registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (id),
+                KEY idx_student_year (student_id, academic_year),
+                KEY idx_course_year (course_id, academic_year)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        }
+
+        $deleteStmt = $mysqli->prepare("DELETE FROM student_course_registration WHERE student_id = ? AND academic_year = ?");
+        $deleteStmt->bind_param('ii', $studentId, $currentYear);
+        $deleteStmt->execute();
+        $deleteStmt->close();
+
+        $lookupStmt = $mysqli->prepare("SELECT id FROM courses WHERE course_name = ? LIMIT 1");
+        $insertStmt = $mysqli->prepare("INSERT INTO student_course_registration (student_id, course_id, academic_year, semester, status, registered_at) VALUES (?, ?, ?, 'Full Year', 'enrolled', NOW())");
+
+        $missingSubjects = [];
+        foreach ($selected_subjects as $subjectName) {
+            $lookupStmt->bind_param('s', $subjectName);
+            $lookupStmt->execute();
+            $result = $lookupStmt->get_result();
+
+            if ($row = $result->fetch_assoc()) {
+                $courseId = (int) $row['id'];
+                $insertStmt->bind_param('iii', $studentId, $courseId, $currentYear);
+                $insertStmt->execute();
+            } else {
+                $missingSubjects[] = $subjectName;
+            }
+        }
+
+        $lookupStmt->close();
+        $insertStmt->close();
+
+        if (!empty($missingSubjects)) {
+            $mysqli->rollback();
+            $mysqli->close();
+            $message = 'Some selected subjects do not match available courses: ' . implode(', ', $missingSubjects);
+            $message_type = 'error';
+        } else {
+            $mysqli->commit();
+            $mysqli->close();
+            $_SESSION['subjects_selected'] = true;
+            $_SESSION['selected_subjects'] = $selected_subjects;
+            $_SESSION['flash'] = [
+                'type' => 'success',
+                'message' => 'Your subjects have been selected successfully.'
+            ];
+            header('Location: student_dashboard.php');
+            exit;
+        }
     }
 }
 ?>
@@ -292,7 +352,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         Complete Registration →
                     </button>
                     
-                    <button type="button" class="btn btn-secondary" onclick="window.location.href='index.php'">
+                    <button type="button" class="btn btn-secondary" onclick="window.location.href='student_dashboard.php'">
                         Cancel
                     </button>
                 </form>
